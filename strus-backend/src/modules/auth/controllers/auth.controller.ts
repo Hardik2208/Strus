@@ -4,7 +4,8 @@ import type {
   Response,
 } from "express";
 import { RefreshTokenService } from "../services/refresh-token.service.js";
-
+import { LogoutService } from "../services/logout.service.js";
+import { logoutSchema } from "../validators/logout.schema.js";
 import { refreshTokenSchema } from "../validators/refresh-token.schema.js";
 import { RegistrationService } from "../services/registration.service.js";
 import { VerificationService } from "../services/verification.service.js";
@@ -42,6 +43,33 @@ export class AuthController {
       next(error);
     }
   }
+
+  // ==================================================
+// Logout
+// ==================================================
+
+static async logout(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { refreshToken } =
+      logoutSchema.parse(req.body);
+
+    await LogoutService.logout(
+      refreshToken
+    );
+
+    res.status(200).json({
+      success: true,
+      message:
+        "Logged out successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
 
   // ==================================================
   // Verify Email

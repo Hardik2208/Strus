@@ -86,6 +86,20 @@ export class SessionRepository {
   }
 
   // ==================================================
+// Delete Session
+// ==================================================
+
+static delete(
+  sessionId: string
+) {
+  return prisma.session.delete({
+    where: {
+      id: sessionId,
+    },
+  });
+}
+
+  // ==================================================
   // Revoke All Sessions
   // ==================================================
 
