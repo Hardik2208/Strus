@@ -2,6 +2,8 @@ import { Prisma } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../core/database/prisma.js";
 
 import { SessionStatus } from "../../../generated/prisma/enums.js";
+import { AppError } from "../../../core/errors/AppError.js";
+import { ErrorCode } from "../../../core/errors/ErrorCodes.js";
 
 export class SessionRepository {
   // ==================================================
@@ -165,4 +167,89 @@ static revokeAllByUserId(
       },
     });
   }
+
+  // ==================================================
+// Get Active Sessions By User
+// ==================================================
+
+static findActiveSessionsByUserId(
+  userId: string
+) {
+  return prisma.session.findMany({
+    where: {
+      userId,
+      status: SessionStatus.ACTIVE,
+    },
+
+    include: {
+      device: true,
+    },
+
+    orderBy: {
+      lastActivityAt: "desc",
+    },
+  });
 }
+
+// ==================================================
+// Revoke One Session
+// ==================================================
+
+static async revokeSession(
+  userId: string,
+  sessionId: string
+) {
+  const session = await prisma.session.findFirst({
+    where: {
+      id: sessionId,
+      userId,
+      status: SessionStatus.ACTIVE,
+    },
+  });
+
+  if (!session) {
+    throw new AppError(
+      "Session not found.",
+      404,
+      ErrorCode.SESSION_NOT_FOUND
+    );
+  }
+
+  return prisma.session.update({
+    where: {
+      id: session.id,
+    },
+    data: {
+      status: SessionStatus.REVOKED,
+      revokedAt: new Date(),
+    },
+  });
+}
+
+// ==================================================
+// Revoke Other Sessions
+// ==================================================
+
+static revokeOtherSessions(
+  userId: string,
+  currentSessionId: string
+) {
+  return prisma.session.updateMany({
+    where: {
+      userId,
+
+      status: SessionStatus.ACTIVE,
+
+      id: {
+        not: currentSessionId,
+      },
+    },
+
+    data: {
+      status: SessionStatus.REVOKED,
+      revokedAt: new Date(),
+    },
+  });
+}
+}
+

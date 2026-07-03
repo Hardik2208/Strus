@@ -150,4 +150,77 @@ export class SessionService {
       expiresIn: 900,
     };
   }
+
+  // ==================================================
+// Get Active Sessions
+// ==================================================
+
+static async getSessions(
+  userId: string,
+  currentSessionId: string
+) {
+  const sessions =
+    await SessionRepository.findActiveSessionsByUserId(
+      userId
+    );
+
+  return sessions.map((session) => ({
+    id: session.id,
+
+    deviceIdentifier:
+      session.device.deviceIdentifier,
+
+    deviceName:
+      session.device.deviceName,
+
+    platform:
+      session.device.platform,
+
+    browser:
+      session.device.browser,
+
+    operatingSystem:
+      session.device.operatingSystem,
+
+    createdAt:
+      session.createdAt,
+
+    lastActivityAt:
+      session.lastActivityAt,
+
+    expiresAt:
+      session.expiresAt,
+
+    isCurrent:
+      session.id === currentSessionId,
+  }));
+}
+
+// ==================================================
+// Logout One Device
+// ==================================================
+
+static async logoutSession(
+  userId: string,
+  sessionId: string
+) {
+  await SessionRepository.revokeSession(
+    userId,
+    sessionId
+  );
+}
+
+// ==================================================
+// Logout Other Devices
+// ==================================================
+
+static async logoutOtherSessions(
+  userId: string,
+  currentSessionId: string
+) {
+  await SessionRepository.revokeOtherSessions(
+    userId,
+    currentSessionId
+  );
+}
 }

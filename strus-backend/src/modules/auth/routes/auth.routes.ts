@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { AuthController } from "../controllers/auth.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
+import { SessionController } from "../controllers/session.controller.js";
 
 const router = Router();
 
@@ -65,6 +66,28 @@ router.get(
   "/me",
   authenticate,
   AuthController.me
+);
+
+// ==================================================
+// Session Management
+// ==================================================
+
+router.get(
+  "/sessions",
+  authenticate,
+  SessionController.getSessions
+);
+
+router.delete(
+  "/sessions/others",
+  authenticate,
+  SessionController.logoutOtherSessions
+);
+
+router.delete(
+  "/sessions/:sessionId",
+  authenticate,
+  SessionController.logoutSession
 );
 
 export default router;
