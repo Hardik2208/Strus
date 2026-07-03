@@ -71,6 +71,7 @@ static async logout(
   }
 }
 
+  
   // ==================================================
   // Verify Email
   // ==================================================
@@ -182,5 +183,47 @@ static async refreshToken(
       next(error);
     }
   }
+
+  // ==================================================
+// Logout All Devices
+// ==================================================
+
+static async logoutAll(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    await LogoutService.logoutAll(
+      req.user.id
+    );
+
+    res.status(200).json({
+      success: true,
+      message:
+        "Logged out from all devices.",
+    });
+  } catch (error) {
+    next(error);
+  }
 }
 
+// ==================================================
+// Current User
+// ==================================================
+
+static async me(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    res.status(200).json({
+      success: true,
+      data: req.user,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+}

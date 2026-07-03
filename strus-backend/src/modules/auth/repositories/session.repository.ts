@@ -32,6 +32,38 @@ export class SessionRepository {
   }
 
   // ==================================================
+  // Find Active Session
+  // ==================================================
+
+  static findActiveById(
+    sessionId: string
+  ) {
+    return prisma.session.findFirst({
+      where: {
+        id: sessionId,
+        status: SessionStatus.ACTIVE,
+      },
+    });
+  }
+
+  // ==================================================
+  // Update Last Activity
+  // ==================================================
+
+  static updateLastActivity(
+    sessionId: string
+  ) {
+    return prisma.session.update({
+      where: {
+        id: sessionId,
+      },
+      data: {
+        lastActivityAt: new Date(),
+      },
+    });
+  }
+
+  // ==================================================
   // Update Refresh Token
   // ==================================================
 
@@ -46,9 +78,7 @@ export class SessionRepository {
       },
       data: {
         refreshTokenHash,
-
         expiresAt,
-
         lastActivityAt: new Date(),
       },
     });
@@ -79,40 +109,58 @@ export class SessionRepository {
       },
       data: {
         status: SessionStatus.REVOKED,
-
         revokedAt: new Date(),
       },
     });
   }
 
   // ==================================================
-// Delete Session
-// ==================================================
+  // Delete Session
+  // ==================================================
 
-static delete(
-  sessionId: string
-) {
-  return prisma.session.delete({
-    where: {
-      id: sessionId,
-    },
-  });
-}
+  static delete(
+    sessionId: string
+  ) {
+    return prisma.session.delete({
+      where: {
+        id: sessionId,
+      },
+    });
+  }
 
   // ==================================================
   // Revoke All Sessions
   // ==================================================
 
-  static revokeAll(userId: string) {
+  // ==================================================
+// Revoke All Sessions
+// ==================================================
+
+static revokeAllByUserId(
+  userId: string
+) {
+  return prisma.session.updateMany({
+    where: {
+      userId,
+      status: SessionStatus.ACTIVE,
+    },
+    data: {
+      status: SessionStatus.REVOKED,
+      revokedAt: new Date(),
+    },
+  });
+}
+
+  static revokeAll(
+    userId: string
+  ) {
     return prisma.session.updateMany({
       where: {
         userId,
-
         status: SessionStatus.ACTIVE,
       },
       data: {
         status: SessionStatus.REVOKED,
-
         revokedAt: new Date(),
       },
     });

@@ -43,4 +43,18 @@ export class LogoutService {
       session.id
     );
   }
+
+  // ==================================================
+// Logout All Devices
+// ==================================================
+
+static async logoutAll(
+  userId: string
+): Promise<void> {
+
+  await SessionRepository.revokeAllByUserId(
+    userId
+  );
+
+}
 }
