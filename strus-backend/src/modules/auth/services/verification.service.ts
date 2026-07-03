@@ -49,17 +49,6 @@ export class VerificationService {
 
           profileCompleted: false,
 
-          profile: {
-            create: {
-              firstName:
-                registration.firstName,
-
-              lastName:
-                registration.lastName,
-
-              displayName: `${registration.firstName} ${registration.lastName}`,
-            },
-          },
         });
 
       // ------------------------------------------

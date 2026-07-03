@@ -80,20 +80,6 @@ export class OAuthService {
         await AuthRepository.createUser({
           email: data.email,
           profileCompleted: false,
-          profile: {
-            create: {
-              firstName:
-                data.firstName,
-
-              lastName:
-                data.lastName,
-
-              displayName: `${data.firstName} ${data.lastName}`,
-
-              avatarUrl:
-                data.avatarUrl,
-            },
-          },
         });
     }
 

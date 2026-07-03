@@ -52,10 +52,6 @@ export class RegistrationService {
     // ------------------------------------------
 
     await OtpService.sendRegistrationOtp({
-      firstName: data.firstName,
-
-      lastName: data.lastName,
-
       email,
 
       passwordHash,

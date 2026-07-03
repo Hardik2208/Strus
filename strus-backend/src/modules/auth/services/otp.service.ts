@@ -16,11 +16,10 @@ export class OtpService {
   // ==================================================
 
   static async sendRegistrationOtp(data: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    passwordHash: string;
-  }): Promise<void> {
+  email: string;
+
+  passwordHash: string;
+}): Promise<void> {
     const { otp, session } =
       RegistrationSessionUtil.create(data);
 
@@ -30,7 +29,6 @@ export class OtpService {
 
     await EmailService.sendVerificationOtp(
       session.email,
-      session.firstName,
       otp
     );
   }
@@ -161,7 +159,6 @@ export class OtpService {
 
     await EmailService.sendVerificationOtp(
       session.email,
-      session.firstName,
       otp
     );
   }

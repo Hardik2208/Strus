@@ -5,7 +5,6 @@ import { env } from "../../../core/config/env.js";
 export class EmailService {
   static async sendVerificationOtp(
     email: string,
-    firstName: string,
     otp: string
   ) {
     await transporter.sendMail({
@@ -23,7 +22,7 @@ export class EmailService {
             font-family:Arial,sans-serif;
           "
         >
-          <h2>Hello ${firstName},</h2>
+          <h2>Hello,</h2>
 
           <p>
             Your verification code is

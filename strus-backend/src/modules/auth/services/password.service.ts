@@ -90,7 +90,6 @@ export class PasswordService {
     void AuthEmailService
       .sendPasswordChangedEmail(
         updatedUser.email,
-        updatedUser.profile?.firstName ??
           "there"
       )
       .catch((error) => {

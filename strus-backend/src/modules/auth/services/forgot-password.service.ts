@@ -92,7 +92,6 @@ export class ForgotPasswordService {
       void AuthEmailService
         .sendForgotPasswordOtp(
           user.email,
-          user.profile?.firstName ??
             "there",
           otp
         )
@@ -134,7 +133,6 @@ export class ForgotPasswordService {
     void AuthEmailService
       .sendForgotPasswordOtp(
         user.email,
-        user.profile?.firstName ??
           "there",
         otp
       )

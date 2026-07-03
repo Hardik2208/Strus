@@ -4,8 +4,6 @@ import type { RegistrationSession } from "../types/registration-session.js";
 
 export class RegistrationSessionUtil {
   static create(data: {
-    firstName: string;
-    lastName: string;
     email: string;
     passwordHash: string;
   }): {
@@ -19,10 +17,6 @@ export class RegistrationSessionUtil {
 
       session: {
         version: 1,
-
-        firstName: data.firstName,
-
-        lastName: data.lastName,
 
         email: data.email,
 

@@ -13,9 +13,6 @@ export class AuthRepository {
       where: {
         email,
       },
-      include: {
-        profile: true,
-      },
     });
   }
 
@@ -23,9 +20,6 @@ export class AuthRepository {
     return prisma.user.findUnique({
       where: {
         id,
-      },
-      include: {
-        profile: true,
       },
     });
   }
@@ -35,9 +29,6 @@ export class AuthRepository {
   ) {
     return prisma.user.create({
       data,
-      include: {
-        profile: true,
-      },
     });
   }
 
@@ -104,54 +95,26 @@ export class AuthRepository {
   // ==================================================
 
   static findOAuthAccount(
-    provider: OAuthProvider,
-    providerUserId: string
-  ) {
-    return prisma.oAuthAccount.findUnique({
-      where: {
-        provider_providerUserId: {
-          provider,
-          providerUserId,
-        },
+  provider: OAuthProvider,
+  providerUserId: string
+) {
+  return prisma.oAuthAccount.findUnique({
+    where: {
+      provider_providerUserId: {
+        provider,
+        providerUserId,
       },
-      include: {
-        user: {
-          include: {
-            profile: true,
-          },
-        },
-      },
-    });
-  }
+    },
+    include: {
+      user: true,
+    },
+  });
+}
 
   static createOAuthAccount(
     data: Prisma.OAuthAccountCreateInput
   ) {
     return prisma.oAuthAccount.create({
-      data,
-    });
-  }
-
-  // ==================================================
-  // Profile
-  // ==================================================
-
-  static findProfile(userId: string) {
-    return prisma.userProfile.findUnique({
-      where: {
-        userId,
-      },
-    });
-  }
-
-  static updateProfile(
-    userId: string,
-    data: Prisma.UserProfileUpdateInput
-  ) {
-    return prisma.userProfile.update({
-      where: {
-        userId,
-      },
       data,
     });
   }

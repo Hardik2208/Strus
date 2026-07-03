@@ -80,7 +80,6 @@ export class ResetPasswordService {
     void AuthEmailService
       .sendPasswordResetEmail(
         updatedUser.email,
-        updatedUser.profile?.firstName ??
           "there"
       )
       .catch(console.error);
