@@ -8,7 +8,7 @@ import { SessionRepository } from "../repositories/session.repository.js";
 import { JwtUtil } from "../utils/jwt.util.js";
 import { TokenUtil } from "../utils/token.util.js";
 
-import type { AuthResponse } from "../types/auth-response.js";
+import type { TokenResponse } from "../types/auth-response.js";
 
 export class RefreshTokenService {
   // ==================================================
@@ -17,7 +17,7 @@ export class RefreshTokenService {
 
   static async refresh(
     refreshToken: string
-  ): Promise<AuthResponse> {
+  ): Promise<TokenResponse> {
     // ------------------------------------------
     // Verify Refresh Token
     // ------------------------------------------

@@ -102,6 +102,9 @@ export class GoogleService {
         userId:
           oauth.user.id,
 
+        profileCompleted:
+    oauth.user.profileCompleted,
+
         deviceIdentifier:
           device.deviceIdentifier,
 
@@ -172,6 +175,9 @@ export class GoogleService {
     return SessionService.create({
       userId:
         user.id,
+
+      profileCompleted:
+        user.profileCompleted,
 
       deviceIdentifier:
         device.deviceIdentifier,

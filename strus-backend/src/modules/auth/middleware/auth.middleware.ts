@@ -127,6 +127,9 @@ try {
       deviceId: session.deviceId,
 
       email: user.email,
+
+      profileCompleted:
+        user.profileCompleted,
     };
 
     next();

@@ -47,6 +47,8 @@ export class VerificationService {
           passwordHash:
             registration.passwordHash,
 
+          profileCompleted: false,
+
           profile: {
             create: {
               firstName:
@@ -67,6 +69,9 @@ export class VerificationService {
       const auth =
         await SessionService.create({
           userId: user.id,
+
+          profileCompleted:
+            user.profileCompleted,
 
           deviceIdentifier:
             data.deviceIdentifier,

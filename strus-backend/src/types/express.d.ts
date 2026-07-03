@@ -7,6 +7,7 @@ declare global {
       email: string;
       sessionId: string;
       deviceId: string;
+      profileCompleted: boolean;
     }
 
     interface Request {

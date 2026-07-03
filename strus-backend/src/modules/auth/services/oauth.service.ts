@@ -46,6 +46,9 @@ export class OAuthService {
       return SessionService.create({
         userId: existingOAuth.user.id,
 
+        profileCompleted:
+          existingOAuth.user.profileCompleted,
+
         deviceIdentifier:
           data.deviceIdentifier,
 
@@ -76,7 +79,7 @@ export class OAuthService {
       user =
         await AuthRepository.createUser({
           email: data.email,
-
+          profileCompleted: false,
           profile: {
             create: {
               firstName:
@@ -121,6 +124,9 @@ export class OAuthService {
 
     return SessionService.create({
       userId: user.id,
+
+      profileCompleted:
+        user.profileCompleted,
 
       deviceIdentifier:
         data.deviceIdentifier,

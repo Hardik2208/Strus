@@ -84,6 +84,9 @@ if (!user.passwordHash) {
     return SessionService.create({
       userId: user.id,
 
+      profileCompleted:
+        user.profileCompleted,
+
       deviceIdentifier:
         data.deviceIdentifier,
 

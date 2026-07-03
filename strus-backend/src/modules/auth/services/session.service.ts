@@ -18,6 +18,8 @@ export class SessionService {
   static async create(data: {
     userId: string;
 
+    profileCompleted: boolean;
+
     deviceIdentifier: string;
 
     deviceName?: string;
@@ -138,6 +140,17 @@ export class SessionService {
       data.userId
     );
 
+    const user =
+      await AuthRepository.findUserById(
+        data.userId
+      );
+
+    if (!user) {
+      throw new Error(
+        "Authenticated user not found."
+      );
+    }
+
     // ------------------------------------------
     // Return Tokens
     // ------------------------------------------
@@ -148,6 +161,9 @@ export class SessionService {
       refreshToken,
 
       expiresIn: 900,
+
+      profileCompleted:
+        user.profileCompleted,
     };
   }
 

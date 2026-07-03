@@ -3,7 +3,6 @@ import app from "./app.js";
 import { env } from "./core/config/env.js";
 import { connectRedis } from "./core/cache/redis.js";
 import { logger } from "./core/logger/index.js";
-import passport from "passport";
 
 async function bootstrap() {
   try {
