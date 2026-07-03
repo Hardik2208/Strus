@@ -27,8 +27,8 @@ export class PasswordController {
       );
 
       await PasswordService.changePassword(
-        req.user.id,
-        req.user.sessionId,
+        req.user!.id,
+        req.user!.sessionId,
         currentPassword,
         newPassword
       );

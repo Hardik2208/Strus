@@ -20,8 +20,8 @@ export class SessionController {
     try {
       const sessions =
         await SessionService.getSessions(
-          req.user.id,
-          req.user.sessionId
+          req.user!.id,
+          req.user!.sessionId
         );
 
       res.status(200).json({
@@ -60,7 +60,7 @@ static async logoutSession(
     }
 
     await SessionService.logoutSession(
-      req.user.id,
+      req.user!.id,
       sessionId!
     );
 
@@ -85,8 +85,8 @@ static async logoutSession(
   ): Promise<void> {
     try {
       await SessionService.logoutOtherSessions(
-        req.user.id,
-        req.user.sessionId
+        req.user!.id,
+        req.user!.sessionId
       );
 
       res.status(200).json({

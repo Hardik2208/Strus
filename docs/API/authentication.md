@@ -66,6 +66,8 @@ SESSION_NOT_FOUND	404
 EMAIL_ALREADY_EXISTS	409
 RATE_LIMITED	429
 INTERNAL_SERVER_ERROR	500
+PASSWORD_NOT_SET    401
+INVALID_GOOGLE_TOKEN    401
 Authentication Headers
 
 Protected APIs
@@ -343,42 +345,63 @@ Response
 }
 Errors
 Invalid Credentials
+
 401 INVALID_CREDENTIALS
+
+Password Not Set
+
+401 PASSWORD_NOT_SET
 Validation Failure
 400 INVALID_REQUEST
+
 Business Rules
+
 Email normalized
+
 User located
+
+If user does not exist
+
+→ INVALID_CREDENTIALS
+
+If passwordHash is NULL
+
+→ PASSWORD_NOT_SET
+
 Password verified using bcrypt
+
 Existing device reused
+
 New device created if required
-Device lastSeenAt updated
+
+Device.lastSeenAt updated
+
 New Session created
+
 Access Token generated
+
 Refresh Token generated
+
 Refresh Token hashed before persistence
-lastLoginAt updated
-Database Changes
 
-Creates
+User.lastLoginAt updated
 
-Session
 
-Updates
 
-Device.lastSeenAt
-User.lastLoginAt
-Redis Changes
+Accounts created using Google Sign-In do not initially have a password.
 
-None
+Email/password login returns
 
-Emails
+401 PASSWORD_NOT_SET
 
-None
+User must either
 
-Side Effects
+Continue with Google Sign-In
 
-Creates authenticated session.
+or
+
+Use Forgot Password to create the first password.
+
 
 POST /api/v1/auth/refresh-token
 Purpose
@@ -1352,6 +1375,14 @@ User Not Found
 Business Rules
 Reset JWT verified
 User loaded
+
+Password may already exist
+
+OR
+
+Password may be created for the first time.
+
+Google Sign-In accounts become eligible for email/password login after password reset.
 Password hashed
 Password updated
 All ACTIVE sessions revoked
@@ -1428,12 +1459,13 @@ OTP
 Random
 SHA-256 Hashed
 Redis only
-Password Effects Matrix
-Action	Password	Current Session	Other Sessions	Email
-Change Password	Updated	Active	Revoked	Password Changed
-Forgot Password	No Change	No Change	No Change	OTP
-Verify OTP	No Change	No Change	No Change	None
-Reset Password	Updated	Revoked	Revoked	Password Reset
+| Action          | Password          | Current Session | Other Sessions | Email            |
+| --------------- | ----------------- | --------------- | -------------- | ---------------- |
+| Change Password | Updated           | Active          | Revoked        | Password Changed |
+| Forgot Password | No Change         | No Change       | No Change      | OTP              |
+| Verify OTP      | No Change         | No Change       | No Change      | None             |
+| Reset Password  | Updated / Created | Revoked         | Revoked        | Password Reset   |
+
 Password Repository Responsibilities
 Method	Purpose
 updatePassword()	Update bcrypt password hash
@@ -1477,3 +1509,278 @@ Security Email Sent
 
 
 #######################################################################
+
+
+Purpose
+
+Allow users to authenticate using their Google account.
+
+Supports:
+
+First-time registration using Google.
+Login using existing Google account.
+Linking Google to an existing email/password account.
+Creating a password later using Forgot Password.
+Endpoint
+POST /api/v1/auth/google
+
+Authentication
+
+No
+Request
+{
+    "idToken":"GOOGLE_ID_TOKEN",
+    "deviceIdentifier":"macbook-air",
+    "deviceName":"MacBook Air",
+    "platform":"MACOS",
+    "browser":"Chrome",
+    "operatingSystem":"macOS"
+}
+Success
+
+HTTP
+
+200 OK
+{
+    "success":true,
+    "message":"Google login successful.",
+    "data":{
+        "accessToken":"...",
+        "refreshToken":"...",
+        "expiresIn":900
+    }
+}
+Errors
+Invalid Google Token
+
+401 INVALID_GOOGLE_TOKEN
+
+Validation Failure
+
+400 INVALID_REQUEST
+Business Rules
+Google ID Token verified
+
+Google Account searched
+
+If linked account exists
+
+↓
+
+Create authenticated session
+
+Otherwise
+
+↓
+
+Search existing email
+
+If email exists
+
+↓
+
+Link Google account
+
+↓
+
+Create authenticated session
+
+Otherwise
+
+↓
+
+Create User
+
+Create UserProfile
+
+Create OAuthAccount
+
+Create authenticated session
+
+Access Token generated
+
+Refresh Token generated
+
+Refresh Token hashed
+
+User.lastLoginAt updated
+Database Changes
+Existing Google User
+
+Creates
+
+Session
+
+Updates
+
+Device.lastSeenAt
+
+User.lastLoginAt
+Existing Email User
+
+Creates
+
+OAuthAccount
+
+Session
+
+Updates
+
+Device.lastSeenAt
+
+User.lastLoginAt
+New Google User
+
+Creates
+
+User
+
+UserProfile
+
+OAuthAccount
+
+Session
+
+Updates
+
+Device.lastSeenAt
+
+User.lastLoginAt
+Redis
+None
+Emails
+None
+Account Linking Rules
+Google account already linked
+
+↓
+
+Login existing account
+
+Existing email/password account
+
+↓
+
+Link Google account
+
+↓
+
+Do NOT create duplicate User
+
+Brand new Google account
+
+↓
+
+Create User
+
+Create Profile
+
+Create OAuthAccount
+Google Account Password Policy
+New Google accounts do not have a password.
+
+Email/password login
+
+↓
+
+401 PASSWORD_NOT_SET
+
+User must
+
+Continue with Google
+
+or
+
+Use Forgot Password
+
+↓
+
+Create first password
+
+↓
+
+Email/password login becomes available.
+Google Authentication Flow
+Frontend
+
+      │
+
+Google Identity Services
+
+      │
+
+Google ID Token
+
+      │
+
+POST /auth/google
+
+      │
+
+Verify Google Token
+
+      │
+
+Existing OAuth Account?
+
+      │
+
+Yes ───────────────► Create Session
+
+      │
+
+No
+
+      │
+
+Find User By Email
+
+      │
+
+Exists?
+
+      │
+
+Yes ───────────────► Link Google
+
+      │                     │
+
+      │                     ▼
+
+      │              Create Session
+
+      │
+
+No
+
+      │
+
+Create User
+
+      │
+
+Create Profile
+
+      │
+
+Create OAuthAccount
+
+      │
+
+Create Session
+
+      │
+
+Return Access Token
+
+Return Refresh Token
+
+
+
+##############################################
+
+Google OAuth
+
+Status: Backend Complete
+Frontend Integration: Pending
+End-to-End Testing: Pending

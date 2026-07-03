@@ -43,13 +43,21 @@ export class LoginService {
         email
       );
 
-    if (!user || !user.passwordHash) {
-      throw new AppError(
-        "Invalid email or password.",
-        401,
-        ErrorCode.INVALID_CREDENTIALS
-      );
-    }
+    if (!user) {
+  throw new AppError(
+    "Invalid email or password.",
+    401,
+    ErrorCode.INVALID_CREDENTIALS
+  );
+}
+
+if (!user.passwordHash) {
+  throw new AppError(
+    "This account doesn't have a password. Continue with Google or create one using Forgot Password.",
+    401,
+    ErrorCode.PASSWORD_NOT_SET
+  );
+}
 
     // ------------------------------------------
     // Verify Password

@@ -5,6 +5,7 @@ import { authenticate } from "../middleware/auth.middleware.js";
 import { SessionController } from "../controllers/session.controller.js";
 import { PasswordController } from "../controllers/password.controller.js";
 import { ForgotPasswordController } from "../controllers/forgot-password.controller.js";
+import googleRoutes from "../oauth/google.routes.js";
 
 const router = Router();
 
@@ -116,6 +117,10 @@ router.post(
 router.post(
   "/reset-password",
   ForgotPasswordController.resetPassword
+);
+
+router.use(
+  googleRoutes
 );
 
 export default router;

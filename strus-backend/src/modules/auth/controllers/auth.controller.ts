@@ -183,8 +183,8 @@ static async refreshToken(
       next(error);
     }
   }
-
-  // ==================================================
+  
+// ==================================================
 // Logout All Devices
 // ==================================================
 
@@ -195,7 +195,7 @@ static async logoutAll(
 ): Promise<void> {
   try {
     await LogoutService.logoutAll(
-      req.user.id
+      req.user!.id
     );
 
     res.status(200).json({
@@ -220,7 +220,7 @@ static async me(
   try {
     res.status(200).json({
       success: true,
-      data: req.user,
+      data: req.user!,
     });
   } catch (error) {
     next(error);
