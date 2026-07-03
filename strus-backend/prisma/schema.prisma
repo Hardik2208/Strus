@@ -67,6 +67,8 @@ model User {
 
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  passwordChangedAt  DateTime?
+
   deletedAt DateTime? @map("deleted_at")
 
   profile UserProfile?

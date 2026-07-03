@@ -3,6 +3,7 @@ import { Router } from "express";
 import { AuthController } from "../controllers/auth.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { SessionController } from "../controllers/session.controller.js";
+import { PasswordController } from "../controllers/password.controller.js";
 
 const router = Router();
 
@@ -88,6 +89,16 @@ router.delete(
   "/sessions/:sessionId",
   authenticate,
   SessionController.logoutSession
+);
+
+// ==================================================
+// Password Management
+// ==================================================
+
+router.patch(
+  "/password",
+  authenticate,
+  PasswordController.changePassword
 );
 
 export default router;
