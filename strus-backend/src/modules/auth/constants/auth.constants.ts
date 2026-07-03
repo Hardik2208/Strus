@@ -5,6 +5,8 @@ export const AuthConstants = {
 
   OTP_MAX_ATTEMPTS: 5,
 
+  FORGOT_PASSWORD_TTL_SECONDS: 10 * 60,
+
   RESEND_BACKOFF_MINUTES: [
     1,
     2,

@@ -48,8 +48,17 @@ export async function authenticate(
     // Verify JWT
     // ============================================
 
-    const payload =
-      JwtUtil.verifyAccessToken(token);
+    let payload;
+
+try {
+  payload = JwtUtil.verifyAccessToken(token);
+} catch (error) {
+  throw new AppError(
+    "Access token has expired.",
+    401,
+    ErrorCode.INVALID_TOKEN
+  );
+}
 
     // ============================================
     // Verify Session

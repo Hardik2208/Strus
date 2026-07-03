@@ -130,43 +130,6 @@ export class SessionRepository {
     });
   }
 
-  // ==================================================
-  // Revoke All Sessions
-  // ==================================================
-
-  // ==================================================
-// Revoke All Sessions
-// ==================================================
-
-static revokeAllByUserId(
-  userId: string
-) {
-  return prisma.session.updateMany({
-    where: {
-      userId,
-      status: SessionStatus.ACTIVE,
-    },
-    data: {
-      status: SessionStatus.REVOKED,
-      revokedAt: new Date(),
-    },
-  });
-}
-
-  static revokeAll(
-    userId: string
-  ) {
-    return prisma.session.updateMany({
-      where: {
-        userId,
-        status: SessionStatus.ACTIVE,
-      },
-      data: {
-        status: SessionStatus.REVOKED,
-        revokedAt: new Date(),
-      },
-    });
-  }
 
   // ==================================================
 // Get Active Sessions By User
@@ -247,6 +210,28 @@ static revokeOtherSessions(
 
     data: {
       status: SessionStatus.REVOKED,
+      revokedAt: new Date(),
+    },
+  });
+}
+
+// ==================================================
+// Revoke All Sessions
+// ==================================================
+
+static revokeAllSessions(
+  userId: string
+) {
+  return prisma.session.updateMany({
+    where: {
+      userId,
+
+      status: SessionStatus.ACTIVE,
+    },
+
+    data: {
+      status: SessionStatus.REVOKED,
+
       revokedAt: new Date(),
     },
   });

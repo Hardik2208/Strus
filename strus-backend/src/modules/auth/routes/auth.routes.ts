@@ -4,6 +4,7 @@ import { AuthController } from "../controllers/auth.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { SessionController } from "../controllers/session.controller.js";
 import { PasswordController } from "../controllers/password.controller.js";
+import { ForgotPasswordController } from "../controllers/forgot-password.controller.js";
 
 const router = Router();
 
@@ -99,6 +100,22 @@ router.patch(
   "/password",
   authenticate,
   PasswordController.changePassword
+);
+
+
+router.post(
+  "/forgot-password",
+  ForgotPasswordController.forgotPassword
+);
+
+router.post(
+  "/verify-forgot-password",
+  ForgotPasswordController.verifyOtp
+);
+
+router.post(
+  "/reset-password",
+  ForgotPasswordController.resetPassword
 );
 
 export default router;

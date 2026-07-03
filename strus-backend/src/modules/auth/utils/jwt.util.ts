@@ -64,4 +64,37 @@ export class JwtUtil {
       env.JWT_REFRESH_SECRET
     ) as JwtPayload;
   }
+
+
+  // ==================================================
+// Reset Password Token
+// ==================================================
+
+static signResetPasswordToken(
+  payload: {
+    email: string;
+  }
+) {
+  return jwt.sign(
+    payload,
+    env.JWT_RESET_SECRET,
+    {
+      expiresIn: "10m",
+    }
+  );
 }
+
+static verifyResetPasswordToken(
+  token: string
+) {
+  return jwt.verify(
+    token,
+    env.JWT_RESET_SECRET
+  ) as {
+    email: string;
+  };
+}
+
+}
+
+

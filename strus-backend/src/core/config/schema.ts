@@ -37,6 +37,8 @@ export const envSchema = z.object({
 
   JWT_REFRESH_EXPIRES_IN: z.string(),
 
+  JWT_RESET_SECRET: z.string().min(32),
+
   // --------------------------------------------------
   // Google OAuth
   // --------------------------------------------------

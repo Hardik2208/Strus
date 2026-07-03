@@ -15,6 +15,4 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 
-
-
-export const REFRESH_TOKEN_EXPIRY_DAYS=30 ;
+export const REFRESH_TOKEN_EXPIRY_DAYS = 30;

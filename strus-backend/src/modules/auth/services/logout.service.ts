@@ -52,7 +52,7 @@ static async logoutAll(
   userId: string
 ): Promise<void> {
 
-  await SessionRepository.revokeAllByUserId(
+  await SessionRepository.revokeAllSessions(
     userId
   );
 
