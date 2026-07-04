@@ -34,4 +34,68 @@ export class ErrorFactory {
       false
     );
   }
+
+  static profileAlreadyCompleted() {
+  return new AppError(
+    "Profile has already been completed.",
+    409,
+    ErrorCode.PROFILE_ALREADY_COMPLETED
+  );
+}
+
+static profileNotFound() {
+  return new AppError(
+    "Profile not found.",
+    404,
+    ErrorCode.PROFILE_NOT_FOUND
+  );
+}
+
+static usernameAlreadyExists() {
+  return new AppError(
+    "Username is already taken.",
+    409,
+    ErrorCode.USERNAME_ALREADY_EXISTS
+  );
+}
+
+static usernameReserved() {
+  return new AppError(
+    "Username is reserved.",
+    400,
+    ErrorCode.USERNAME_UNAVAILABLE
+  );
+}
+
+static usernameProhibited() {
+  return new AppError(
+    "Username contains prohibited words.",
+    400,
+    ErrorCode.USERNAME_UNAVAILABLE
+  );
+}
+
+static invalidUsername() {
+  return new AppError(
+    "Invalid username.",
+    400,
+    ErrorCode.INVALID_USERNAME
+  );
+}
+
+static invalidCountryCode() {
+  return new AppError(
+    "Invalid country code.",
+    400,
+    ErrorCode.INVALID_COUNTRY_CODE
+  );
+}
+
+static invalidTimezone() {
+  return new AppError(
+    "Invalid timezone.",
+    400,
+    ErrorCode.INVALID_TIMEZONE
+  );
+}
 }

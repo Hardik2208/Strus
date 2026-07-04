@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 
 import { ZodError } from "zod";
-
+import multer from "multer";
 import { AppError } from "../errors/AppError.js";
 import { ErrorCode } from "../errors/ErrorCodes.js";
 import { logger } from "../logger/index.js";
@@ -12,6 +12,40 @@ export const errorMiddleware = (
   res: Response,
   _next: NextFunction
 ): void => {
+
+  // --------------------------------------------------
+// Multer Errors
+// --------------------------------------------------
+
+if (error instanceof multer.MulterError) {
+  logger.error(error);
+
+  switch (error.code) {
+    case "LIMIT_FILE_SIZE":
+      res.status(400).json({
+        success: false,
+        message: "Avatar size must not exceed 2 MB.",
+        code: ErrorCode.FILE_TOO_LARGE,
+      });
+      return;
+
+    case "LIMIT_FILE_COUNT":
+      res.status(400).json({
+        success: false,
+        message: "Only one avatar can be uploaded.",
+        code: ErrorCode.INVALID_FILE_TYPE,
+      });
+      return;
+
+    default:
+      res.status(400).json({
+        success: false,
+        message: "Invalid avatar upload.",
+        code: ErrorCode.INVALID_FILE_TYPE,
+      });
+      return;
+  }
+}
   // --------------------------------------------------
   // App Errors
   // --------------------------------------------------

@@ -38,10 +38,6 @@ export class GoogleRepository {
       where: {
         email,
       },
-
-      include: {
-        profile: true,
-      },
     });
   }
 
@@ -91,31 +87,12 @@ export class GoogleRepository {
     return prisma.$transaction(
       async (tx) => {
         const user =
-          await tx.user.create({
-            data: {
-              email: data.email,
-
-              profile: {
-                create: {
-                  firstName:
-                    data.firstName,
-
-                  lastName:
-                    data.lastName,
-
-                  displayName:
-                    `${data.firstName} ${data.lastName}`.trim(),
-
-                  avatarUrl:
-                    data.avatarUrl,
-                },
-              },
-            },
-
-            include: {
-              profile: true,
-            },
-          });
+  await tx.user.create({
+    data: {
+      email: data.email,
+      profileCompleted: false,
+    },
+  });
 
         await tx.oAuthAccount.create({
           data: {

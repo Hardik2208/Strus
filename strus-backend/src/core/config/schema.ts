@@ -64,15 +64,6 @@ export const envSchema = z.object({
   EMAIL_VERIFICATION_OTP_EXPIRY_MINUTES: z.coerce.number().default(10),
 
   // --------------------------------------------------
-  // Cloudinary
-  // --------------------------------------------------
-  CLOUDINARY_CLOUD_NAME: z.string().optional(),
-
-  CLOUDINARY_API_KEY: z.string().optional(),
-
-  CLOUDINARY_API_SECRET: z.string().optional(),
-
-  // --------------------------------------------------
   // Security
   // --------------------------------------------------
   BCRYPT_ROUNDS: z.coerce.number().min(10).max(16),
@@ -80,6 +71,17 @@ export const envSchema = z.object({
   COOKIE_SECRET: z.string().min(32),
 
   FRONTEND_URL: z.string().url(),
+
+  // --------------------------------------------------
+  // Cloudinary
+  // --------------------------------------------------
+
+  CLOUDINARY_CLOUD_NAME: z.string().min(1),
+
+  CLOUDINARY_API_KEY: z.string().min(1),
+
+  CLOUDINARY_API_SECRET: z.string().min(1),
+
 });
 
 export type Env = z.infer<typeof envSchema>;
