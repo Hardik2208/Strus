@@ -2,8 +2,6 @@ import { OAuth2Client } from "google-auth-library";
 
 import { env } from "../../../core/config/env.js";
 
-import { DevicePlatform } from "../../../generated/prisma/enums.js";
-
 import { AppError } from "../../../core/errors/AppError.js";
 import { ErrorCode } from "../../../core/errors/ErrorCodes.js";
 
@@ -12,6 +10,8 @@ import { GoogleRepository } from "./google.repository.js";
 import { SessionService } from "../services/session.service.js";
 
 import type { AuthResponse } from "../types/auth-response.js";
+import type { GoogleLoginRequest } from "../types/google-login-request.js";
+import type { GoogleProfile } from "../types/google-profile.js";
 
 const client = new OAuth2Client(
   env.GOOGLE_CLIENT_ID
@@ -24,7 +24,7 @@ export class GoogleService {
 
   static async verifyIdToken(
     idToken: string
-  ) {
+  ): Promise<GoogleProfile> {
     const ticket =
       await client.verifyIdToken({
         idToken,
@@ -70,22 +70,11 @@ export class GoogleService {
   // ==================================================
 
   static async login(
-    idToken: string,
-    device: {
-      deviceIdentifier: string;
-
-      deviceName?: string;
-
-      platform: DevicePlatform;
-
-      browser?: string;
-
-      operatingSystem?: string;
-    }
+    data: GoogleLoginRequest
   ): Promise<AuthResponse> {
     const profile =
       await this.verifyIdToken(
-        idToken
+        data.idToken
       );
 
     // ------------------------------------------
@@ -103,22 +92,22 @@ export class GoogleService {
           oauth.user.id,
 
         profileCompleted:
-    oauth.user.profileCompleted,
+          oauth.user.profileCompleted,
 
         deviceIdentifier:
-          device.deviceIdentifier,
+          data.deviceIdentifier,
 
         deviceName:
-          device.deviceName,
+          data.deviceName,
 
         platform:
-          device.platform,
+          data.platform,
 
         browser:
-          device.browser,
+          data.browser,
 
         operatingSystem:
-          device.operatingSystem,
+          data.operatingSystem,
       });
     }
 
@@ -139,13 +128,7 @@ export class GoogleService {
 
         profile.email
       );
-    }
-
-    // ------------------------------------------
-    // New User
-    // ------------------------------------------
-
-    else {
+    } else {
       user =
         await GoogleRepository.createGoogleUser({
           email:
@@ -180,19 +163,19 @@ export class GoogleService {
         user.profileCompleted,
 
       deviceIdentifier:
-        device.deviceIdentifier,
+        data.deviceIdentifier,
 
       deviceName:
-        device.deviceName,
+        data.deviceName,
 
       platform:
-        device.platform,
+        data.platform,
 
       browser:
-        device.browser,
+        data.browser,
 
       operatingSystem:
-        device.operatingSystem,
+        data.operatingSystem,
     });
   }
 }

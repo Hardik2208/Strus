@@ -44,6 +44,43 @@ enum SessionStatus {
   EXPIRED
 }
 
+enum WorkspaceType {
+  PERSONAL
+  TEAM
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum WorkspaceInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum AuditAction {
+  WORKSPACE_CREATED
+  WORKSPACE_UPDATED
+  WORKSPACE_DELETED
+
+  MEMBER_JOINED
+  MEMBER_REMOVED
+
+  MEMBER_PROMOTED
+  MEMBER_DEMOTED
+
+  INVITATION_CREATED
+  INVITATION_ACCEPTED
+  INVITATION_DECLINED
+  INVITATION_CANCELLED
+
+  OWNERSHIP_TRANSFERRED
+}
+
 //
 // ======================================================
 // AUTHENTICATION
@@ -74,7 +111,21 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   //
-  // Relations
+  // Workspace Relations
+  //
+
+  ownedWorkspaces Workspace[] @relation("WorkspaceOwner")
+
+  workspaceMemberships WorkspaceMember[]
+
+  sentWorkspaceInvitations WorkspaceInvitation[] @relation("WorkspaceInvitationSender")
+
+  receivedWorkspaceInvitations WorkspaceInvitation[] @relation("WorkspaceInvitationRecipient")
+
+  auditLogs WorkspaceAuditLog[]
+
+  //
+  // Other Relations
   //
 
   profile UserProfile?
@@ -90,11 +141,8 @@ model User {
   professionalReputation ProfessionalReputation?
 
   @@index([status])
-
   @@index([verificationLevel])
-
   @@index([deletedAt])
-
   @@map("users")
 }
 
@@ -198,7 +246,6 @@ model OAuthAccount {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerUserId])
-
   @@map("oauth_accounts")
 }
 
@@ -234,9 +281,7 @@ model Device {
   sessions Session[]
 
   @@unique([userId, deviceIdentifier])
-
   @@index([userId])
-
   @@map("devices")
 }
 
@@ -272,10 +317,107 @@ model Session {
   device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
   @@index([deviceId])
-
   @@index([expiresAt])
-
   @@index([userId, status, lastActivityAt(sort: Desc)])
-
   @@map("sessions")
+}
+
+//
+// ======================================================
+// Workspace
+// ======================================================
+//
+
+model Workspace {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerId String @map("owner_id") @db.Uuid
+
+  owner User @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String @db.VarChar(100)
+
+  slug String @unique @db.VarChar(120)
+
+  description String? @db.VarChar(1000)
+
+  workspaceType WorkspaceType @map("workspace_type")
+
+  members WorkspaceMember[]
+
+  invitations WorkspaceInvitation[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  auditLogs WorkspaceAuditLog[]
+
+  @@index([ownerId])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  workspaceId String @map("workspace_id") @db.Uuid
+  userId      String @map("user_id") @db.Uuid
+
+  role WorkspaceRole
+
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId])
+  @@index([userId])
+  @@index([workspaceId])
+  @@map("workspace_members")
+}
+
+model WorkspaceInvitation {
+  id String @id @default(uuid()) @db.Uuid
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  invitedByUserId String @map("invited_by_user_id") @db.Uuid
+  invitedBy       User   @relation("WorkspaceInvitationSender", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+
+  invitedUserId String @map("invited_user_id") @db.Uuid
+
+  invitedUser User @relation("WorkspaceInvitationRecipient", fields: [invitedUserId], references: [id], onDelete: Cascade)
+
+  status WorkspaceInvitationStatus @default(PENDING)
+
+  expiresAt DateTime @map("expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([invitedUserId])
+  @@index([status])
+  @@map("workspace_invitations")
+}
+
+model WorkspaceAuditLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  actorId String @map("actor_id") @db.Uuid
+  actor   User   @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  action AuditAction
+
+  entityId String? @map("entity_id") @db.Uuid
+
+  metadata Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([actorId])
+  @@map("workspace_audit_logs")
 }

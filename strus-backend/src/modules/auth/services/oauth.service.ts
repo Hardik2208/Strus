@@ -1,37 +1,20 @@
-import { DevicePlatform, OAuthProvider } from "../../../generated/prisma/enums.js";
+import { OAuthProvider } from "../../../generated/prisma/enums.js";
 
 import { AuthRepository } from "../repositories/auth.repository.js";
 
 import { SessionService } from "./session.service.js";
 
 import type { AuthResponse } from "../types/auth-response.js";
+import type { GoogleOAuthRequest } from "../types/google-oauth-request.js";
 
 export class OAuthService {
   // ==================================================
   // Google Login
   // ==================================================
 
-  static async loginWithGoogle(data: {
-    providerUserId: string;
-
-    email: string;
-
-    firstName: string;
-
-    lastName: string;
-
-    avatarUrl?: string;
-
-    deviceIdentifier: string;
-
-    deviceName?: string;
-
-    platform: DevicePlatform;
-
-    browser?: string;
-
-    operatingSystem?: string;
-  }): Promise<AuthResponse> {
+  static async loginWithGoogle(
+    data: GoogleOAuthRequest
+  ): Promise<AuthResponse> {
     // ------------------------------------------
     // Existing OAuth Account
     // ------------------------------------------
@@ -44,7 +27,8 @@ export class OAuthService {
 
     if (existingOAuth) {
       return SessionService.create({
-        userId: existingOAuth.user.id,
+        userId:
+          existingOAuth.user.id,
 
         profileCompleted:
           existingOAuth.user.profileCompleted,
@@ -67,7 +51,7 @@ export class OAuthService {
     }
 
     // ------------------------------------------
-    // Existing Email
+    // Existing Email Account
     // ------------------------------------------
 
     let user =
@@ -78,8 +62,11 @@ export class OAuthService {
     if (!user) {
       user =
         await AuthRepository.createUser({
-          email: data.email,
-          profileCompleted: false,
+          email:
+            data.email,
+
+          profileCompleted:
+            false,
         });
     }
 
@@ -109,7 +96,8 @@ export class OAuthService {
     // ------------------------------------------
 
     return SessionService.create({
-      userId: user.id,
+      userId:
+        user.id,
 
       profileCompleted:
         user.profileCompleted,

@@ -2,7 +2,7 @@ import { prisma } from "../../../core/database/prisma.js";
 
 import { AppError } from "../../../core/errors/AppError.js";
 import { ErrorCode } from "../../../core/errors/ErrorCodes.js";
-
+import { WorkspaceService } from "../../workspace/services/workspace.service.js";
 import type { UpdateUsernameDto } from "../dtos/update-username.dto.js";
 import type { UpdateUsernameResponse } from "../interfaces/update-username-response.interface.js";
 import { ProfileMapper } from "../mappers/profile.mapper.js";
@@ -138,42 +138,49 @@ export class ProfileService {
     // ------------------------------------------
 
     const response = await prisma.$transaction(
-      async (tx) => {
-        const profile =
-          await profileRepository.create(tx, {
-            user: {
-              connect: {
-                id: userId,
-              },
-            },
-
-            username,
-
-            firstName: data.firstName.trim(),
-
-            lastName: data.lastName.trim(),
-
-            bio: data.bio?.trim(),
-
-            countryCode:
-              data.countryCode.toUpperCase(),
-
-            timezone: data.timezone,
-          });
-
-        await tx.user.update({
-          where: {
+  async (tx) => {
+    const profile =
+      await profileRepository.create(tx, {
+        user: {
+          connect: {
             id: userId,
           },
+        },
 
-          data: {
-            profileCompleted: true,
-          },
-        });
+        username,
 
-        return ProfileMapper.toResponse(profile);
-      }
-    );
+        firstName: data.firstName.trim(),
+
+        lastName: data.lastName.trim(),
+
+        bio: data.bio?.trim(),
+
+        countryCode:
+          data.countryCode.toUpperCase(),
+
+        timezone: data.timezone,
+      });
+
+    await WorkspaceService.createPersonalWorkspace(tx, {
+      userId,
+      username: profile.username,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+    });
+
+    await tx.user.update({
+      where: {
+        id: userId,
+      },
+
+      data: {
+        profileCompleted: true,
+      },
+    });
+
+    return ProfileMapper.toResponse(profile);
+  }
+);
 
     // ------------------------------------------
     // Cache

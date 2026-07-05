@@ -161,6 +161,136 @@ async removeAvatar(
   });
 }
 
+async searchUsers(query: string) {
+  return prisma.user.findMany({
+    where: {
+      profileCompleted: true,
+
+      profile: {
+        is: {
+          OR: [
+            {
+              username: {
+                contains: query,
+                mode: "insensitive",
+              },
+            },
+            {
+              firstName: {
+                contains: query,
+                mode: "insensitive",
+              },
+            },
+            {
+              lastName: {
+                contains: query,
+                mode: "insensitive",
+              },
+            },
+          ],
+        },
+      },
+    },
+
+    select: {
+      id: true,
+
+      profile: {
+        select: {
+          username: true,
+          firstName: true,
+          lastName: true,
+          avatarUrl: true,
+        },
+      },
+    },
+
+    take: 20,
+  });
+}
+
+async searchProfiles(
+  query: string,
+  page: number,
+  limit: number,
+  options?: {
+    excludeUserIds?: string[];
+  }
+): Promise<{
+  items: {
+    id: string;
+    username: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl: string | null;
+  }[];
+
+  total: number;
+}> {
+  const where: Prisma.UserProfileWhereInput = {
+    OR: [
+      {
+        username: {
+          contains: query,
+          mode: "insensitive",
+        },
+      },
+      {
+        firstName: {
+          contains: query,
+          mode: "insensitive",
+        },
+      },
+      {
+        lastName: {
+          contains: query,
+          mode: "insensitive",
+        },
+      },
+    ],
+
+    ...(options?.excludeUserIds?.length
+      ? {
+          userId: {
+            notIn:
+              options.excludeUserIds,
+          },
+        }
+      : {}),
+  };
+
+  const [items, total] =
+    await prisma.$transaction([
+      prisma.userProfile.findMany({
+        where,
+
+        select: {
+          id: true,
+          username: true,
+          firstName: true,
+          lastName: true,
+          avatarUrl: true,
+        },
+
+        orderBy: {
+          username: "asc",
+        },
+
+        skip: (page - 1) * limit,
+
+        take: limit,
+      }),
+
+      prisma.userProfile.count({
+        where,
+      }),
+    ]);
+
+  return {
+    items,
+    total,
+  };
+}
 }
 
 

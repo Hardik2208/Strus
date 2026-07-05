@@ -1,4 +1,8 @@
+import { createServer } from "http";
+
 import app from "./app.js";
+
+import { initializeSocket } from "./core/socket/socket.js";
 
 import { env } from "./core/config/env.js";
 import { connectRedis } from "./core/cache/redis.js";
@@ -6,9 +10,14 @@ import { logger } from "./core/logger/index.js";
 
 async function bootstrap() {
   try {
-
     await connectRedis();
-    const server = app.listen(
+
+    const httpServer =
+      createServer(app);
+
+    initializeSocket(httpServer);
+
+    httpServer.listen(
       env.PORT,
       env.HOST,
       () => {
@@ -21,7 +30,7 @@ async function bootstrap() {
     const shutdown = async () => {
       logger.info("Shutting down...");
 
-      server.close(() => {
+      httpServer.close(() => {
         process.exit(0);
       });
     };

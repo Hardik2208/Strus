@@ -1736,3 +1736,407 @@ Implemented features:
 - Deterministic public IDs
 
 ###############################################################################################################
+
+
+# Global User Search
+
+## Purpose
+
+The Global User Search component enables authenticated users to discover other users across the platform.
+
+It provides a lightweight search API optimized for autocomplete experiences such as:
+
+- Inviting members to workspaces
+- Adding collaborators
+- Mentioning users
+- Assigning tasks
+- Future chat user lookup
+
+The API intentionally returns only public identity information and excludes all private user data.
+
+---
+
+# Responsibilities
+
+Global User Search is responsible for:
+
+- Searching users by username
+- Searching users by first name
+- Searching users by last name
+- Returning lightweight public user information
+- Pagination
+- Future support for excluding users
+
+It is **not** responsible for:
+
+- Returning full profiles
+- User authentication
+- User authorization
+- Workspace membership filtering
+- Organization membership filtering
+
+---
+
+# Search Flow
+
+```
+Client
+
+    │
+
+    ▼
+
+Search Service
+
+    │
+
+Normalize Query
+
+    │
+
+Validate Pagination
+
+    │
+
+Repository
+
+    │
+
+PostgreSQL
+
+    │
+
+Mapper
+
+    │
+
+Response
+```
+
+---
+
+# Search Fields
+
+The search is performed against the following fields:
+
+- Username
+- First Name
+- Last Name
+
+Search is case-insensitive.
+
+Example:
+
+Searching for
+
+```
+hard
+```
+
+matches
+
+```
+hardik2208
+
+Hardik
+
+HARDIK
+
+HaRdIk
+```
+
+---
+
+# Matching Strategy
+
+The current implementation performs partial matching using case-insensitive search.
+
+Equivalent SQL behavior:
+
+```
+ILIKE '%query%'
+```
+
+Examples:
+
+```
+hard
+
+↓
+
+hardik2208
+
+↓
+
+Hardik
+
+↓
+
+Raghuvanshi
+```
+
+---
+
+# Public Response
+
+Only public identity information is returned.
+
+```
+{
+    "id": "...",
+    "username": "hardik2208",
+    "firstName": "Hardik",
+    "lastName": "Raghuvanshi",
+    "avatarUrl": null
+}
+```
+
+---
+
+# Private Fields
+
+The following fields are intentionally excluded.
+
+- Email
+- Password
+- Country
+- Timezone
+- Bio
+- Verification Level
+- Authentication Data
+- Session Information
+
+This prevents accidental exposure of sensitive user information.
+
+---
+
+# Pagination
+
+The endpoint supports pagination.
+
+Current defaults:
+
+```
+page = 1
+
+limit = 5
+```
+
+The implementation intentionally returns only five records because the endpoint is designed for autocomplete rather than browsing.
+
+---
+
+# Sorting
+
+Results are ordered by:
+
+```
+username ASC
+```
+
+This provides deterministic ordering for repeated searches.
+
+---
+
+# Repository Design
+
+The repository is intentionally future-proof.
+
+Current signature:
+
+```ts
+searchProfiles(
+    query,
+    page,
+    limit,
+    options?
+)
+```
+
+Optional parameters:
+
+```ts
+{
+    excludeUserIds?: string[]
+}
+```
+
+---
+
+# Why excludeUserIds?
+
+Future modules such as Workspace and Organization require searching only users who are **not already members**.
+
+Example:
+
+Workspace Members
+
+```
+Current Members
+
+↓
+
+Extract User IDs
+
+↓
+
+Search Profiles
+
+↓
+
+Exclude Existing Members
+
+↓
+
+Return Remaining Users
+```
+
+Because the repository already supports exclusions, these future features can reuse the existing implementation without modification.
+
+---
+
+# Cache Strategy
+
+No Redis cache is used.
+
+Reasons:
+
+- Search results change frequently.
+- User updates should appear immediately.
+- Search queries have low cache reuse.
+- PostgreSQL indexing provides sufficient performance.
+
+The endpoint always queries PostgreSQL directly.
+
+---
+
+# Database Query
+
+The repository performs:
+
+- Case-insensitive matching
+- Pagination
+- Ordering
+- Lightweight field selection
+- Total count calculation
+
+Only the required columns are selected.
+
+No unnecessary profile information is loaded.
+
+---
+
+# Response Structure
+
+```
+{
+    "success": true,
+    "data": [
+        {
+            "id": "...",
+            "username": "hardik2208",
+            "firstName": "Hardik",
+            "lastName": "Raghuvanshi",
+            "avatarUrl": null
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "limit": 5,
+        "total": 13,
+        "totalPages": 3,
+        "hasNext": true
+    }
+}
+```
+
+---
+
+# API Endpoint
+
+## Search Users
+
+```
+GET /api/v1/users/search
+```
+
+Query Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| q | Search query |
+| page | Page number |
+
+Example:
+
+```
+GET /api/v1/users/search?q=hard&page=1
+```
+
+---
+
+# Performance Considerations
+
+The endpoint is optimized for high-frequency usage.
+
+Design choices include:
+
+- Lightweight response payload
+- Fixed page size
+- Indexed username lookup
+- Case-insensitive search
+- Minimal column selection
+- Single transaction for count and results
+
+These optimizations make the endpoint suitable for autocomplete interactions with low latency.
+
+---
+
+# Security Considerations
+
+The endpoint requires authentication.
+
+Every request:
+
+- Validates the JWT
+- Returns only public user information
+- Never exposes authentication or profile-sensitive fields
+
+The backend remains the single source of truth for access control.
+
+---
+
+# Future Extensions
+
+The current architecture supports future enhancements without redesign.
+
+Potential additions include:
+
+- Workspace member search
+- Organization member search
+- Mention search
+- Chat user lookup
+- Recently searched users
+- Search ranking
+- Fuzzy matching
+- Trigram similarity
+- Full-text search
+- Search analytics
+
+The repository has already been designed to support these future use cases through optional exclusion filters.
+
+---
+
+# Current Scope
+
+Implemented features:
+
+- Username search
+- First name search
+- Last name search
+- Case-insensitive matching
+- Pagination
+- Username-based sorting
+- Public response projection
+- Future-ready exclusion support
+- Authentication-protected endpoint

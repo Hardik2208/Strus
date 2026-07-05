@@ -26,23 +26,7 @@ export class GoogleController {
 
       const auth =
         await GoogleService.login(
-          data.idToken,
-          {
-            deviceIdentifier:
-              data.deviceIdentifier,
-
-            deviceName:
-              data.deviceName,
-
-            platform:
-              data.platform,
-
-            browser:
-              data.browser,
-
-            operatingSystem:
-              data.operatingSystem,
-          }
+          data
         );
 
       res.status(200).json({

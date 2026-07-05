@@ -1,7 +1,5 @@
 import crypto from "node:crypto";
 
-import { DevicePlatform } from "../../../generated/prisma/enums.js";
-
 import { AuthRepository } from "../repositories/auth.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
 
@@ -9,27 +7,16 @@ import { JwtUtil } from "../utils/jwt.util.js";
 import { TokenUtil } from "../utils/token.util.js";
 
 import type { AuthResponse } from "../types/auth-response.js";
+import type { CreateSessionRequest } from "../types/create-session-request.js";
 
 export class SessionService {
   // ==================================================
   // Create Authenticated Session
   // ==================================================
 
-  static async create(data: {
-    userId: string;
-
-    profileCompleted: boolean;
-
-    deviceIdentifier: string;
-
-    deviceName?: string;
-
-    platform: DevicePlatform;
-
-    browser?: string;
-
-    operatingSystem?: string;
-  }): Promise<AuthResponse> {
+  static async create(
+    data: CreateSessionRequest
+  ): Promise<AuthResponse> {
     // ------------------------------------------
     // Find/Create Device
     // ------------------------------------------
@@ -46,11 +33,14 @@ export class SessionService {
           deviceIdentifier:
             data.deviceIdentifier,
 
-          deviceName: data.deviceName,
+          deviceName:
+            data.deviceName,
 
-          platform: data.platform,
+          platform:
+            data.platform,
 
-          browser: data.browser,
+          browser:
+            data.browser,
 
           operatingSystem:
             data.operatingSystem,
@@ -117,7 +107,8 @@ export class SessionService {
             1000
       ),
 
-      lastActivityAt: new Date(),
+      lastActivityAt:
+        new Date(),
 
       user: {
         connect: {
@@ -140,17 +131,6 @@ export class SessionService {
       data.userId
     );
 
-    const user =
-      await AuthRepository.findUserById(
-        data.userId
-      );
-
-    if (!user) {
-      throw new Error(
-        "Authenticated user not found."
-      );
-    }
-
     // ------------------------------------------
     // Return Tokens
     // ------------------------------------------
@@ -163,80 +143,83 @@ export class SessionService {
       expiresIn: 900,
 
       profileCompleted:
-        user.profileCompleted,
+        data.profileCompleted,
     };
   }
 
   // ==================================================
-// Get Active Sessions
-// ==================================================
+  // Get Active Sessions
+  // ==================================================
 
-static async getSessions(
-  userId: string,
-  currentSessionId: string
-) {
-  const sessions =
-    await SessionRepository.findActiveSessionsByUserId(
-      userId
+  static async getSessions(
+    userId: string,
+    currentSessionId: string
+  ) {
+    const sessions =
+      await SessionRepository.findActiveSessionsByUserId(
+        userId
+      );
+
+    return sessions.map(
+      (session) => ({
+        id: session.id,
+
+        deviceIdentifier:
+          session.device.deviceIdentifier,
+
+        deviceName:
+          session.device.deviceName,
+
+        platform:
+          session.device.platform,
+
+        browser:
+          session.device.browser,
+
+        operatingSystem:
+          session.device.operatingSystem,
+
+        createdAt:
+          session.createdAt,
+
+        lastActivityAt:
+          session.lastActivityAt,
+
+        expiresAt:
+          session.expiresAt,
+
+        isCurrent:
+          session.id ===
+          currentSessionId,
+      })
     );
+  }
 
-  return sessions.map((session) => ({
-    id: session.id,
+  // ==================================================
+  // Logout One Device
+  // ==================================================
 
-    deviceIdentifier:
-      session.device.deviceIdentifier,
+  static async logoutSession(
+    userId: string,
+    sessionId: string
+  ) {
+    await SessionRepository.revokeSession(
+      userId,
+      sessionId
+    );
+  }
 
-    deviceName:
-      session.device.deviceName,
+  // ==================================================
+  // Logout Other Devices
+  // ==================================================
 
-    platform:
-      session.device.platform,
-
-    browser:
-      session.device.browser,
-
-    operatingSystem:
-      session.device.operatingSystem,
-
-    createdAt:
-      session.createdAt,
-
-    lastActivityAt:
-      session.lastActivityAt,
-
-    expiresAt:
-      session.expiresAt,
-
-    isCurrent:
-      session.id === currentSessionId,
-  }));
-}
-
-// ==================================================
-// Logout One Device
-// ==================================================
-
-static async logoutSession(
-  userId: string,
-  sessionId: string
-) {
-  await SessionRepository.revokeSession(
-    userId,
-    sessionId
-  );
-}
-
-// ==================================================
-// Logout Other Devices
-// ==================================================
-
-static async logoutOtherSessions(
-  userId: string,
-  currentSessionId: string
-) {
-  await SessionRepository.revokeOtherSessions(
-    userId,
-    currentSessionId
-  );
-}
+  static async logoutOtherSessions(
+    userId: string,
+    currentSessionId: string
+  ) {
+    await SessionRepository.revokeOtherSessions(
+      userId,
+      currentSessionId
+    );
+  }
 }
