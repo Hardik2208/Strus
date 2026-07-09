@@ -45,19 +45,6 @@ export class ProjectService {
       dto.description
     );
 
-    ProjectValidator.validateEstimatedBudget(
-      dto.estimatedBudget
-    );
-
-    ProjectValidator.validateEstimatedDuration(
-      dto.estimatedDuration
-    );
-
-    ProjectValidator.validateExpectedDates(
-      dto.expectedStartDate,
-      dto.expectedCompletionDate
-    );
-
     const project =
       await ProjectRepository.create(tx, {
         workspace: {
@@ -79,17 +66,6 @@ export class ProjectService {
 
         status: ProjectStatus.DRAFT,
 
-        estimatedBudget:
-          dto.estimatedBudget,
-
-        estimatedDuration:
-          dto.estimatedDuration,
-
-        expectedStartDate:
-          dto.expectedStartDate,
-
-        expectedCompletionDate:
-          dto.expectedCompletionDate,
       });
 
     await ProjectAuditRepository.create(tx, {
@@ -174,19 +150,6 @@ export class ProjectService {
       dto.description
     );
 
-    ProjectValidator.validateEstimatedBudget(
-      dto.estimatedBudget
-    );
-
-    ProjectValidator.validateEstimatedDuration(
-      dto.estimatedDuration
-    );
-
-    ProjectValidator.validateExpectedDates(
-      dto.expectedStartDate,
-      dto.expectedCompletionDate
-    );
-
     const project =
       await ProjectRepository.update(
         tx,
@@ -202,30 +165,6 @@ export class ProjectService {
             description:
               dto.description?.trim() ??
               null,
-          }),
-
-          ...(dto.estimatedBudget !==
-            undefined && {
-            estimatedBudget:
-              dto.estimatedBudget,
-          }),
-
-          ...(dto.estimatedDuration !==
-            undefined && {
-            estimatedDuration:
-              dto.estimatedDuration,
-          }),
-
-          ...(dto.expectedStartDate !==
-            undefined && {
-            expectedStartDate:
-              dto.expectedStartDate,
-          }),
-
-          ...(dto.expectedCompletionDate !==
-            undefined && {
-            expectedCompletionDate:
-              dto.expectedCompletionDate,
           }),
         }
       );

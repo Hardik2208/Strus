@@ -13,13 +13,6 @@ export const createProjectSchema = z.object({
   .max(2000)
   .optional(),
 
-  estimatedBudget: z.number().positive().optional(),
-
-  estimatedDuration: z.number().int().positive().optional(),
-
-  expectedStartDate: z.coerce.date().optional(),
-
-  expectedCompletionDate: z.coerce.date().optional(),
 });
 
 export type CreateProjectDto = z.infer<

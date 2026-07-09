@@ -15,14 +15,6 @@ export interface ProjectResponse {
 
   status: ProjectStatus;
 
-  estimatedBudget: number | null;
-
-  estimatedDuration: number | null;
-
-  expectedStartDate: Date | null;
-
-  expectedCompletionDate: Date | null;
-
   createdAt: Date;
 
   updatedAt: Date;

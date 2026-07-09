@@ -18,19 +18,6 @@ export class ProjectMapper {
 
       status: project.status,
 
-      estimatedBudget: project.estimatedBudget
-        ? Number(project.estimatedBudget)
-        : null,
-
-      estimatedDuration:
-        project.estimatedDuration,
-
-      expectedStartDate:
-        project.expectedStartDate,
-
-      expectedCompletionDate:
-        project.expectedCompletionDate,
-
       createdAt: project.createdAt,
 
       updatedAt: project.updatedAt,

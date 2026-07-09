@@ -465,12 +465,6 @@ model Project {
 
   status ProjectStatus @default(DRAFT)
 
-  estimatedBudget   Decimal? @db.Decimal(12, 2)
-  estimatedDuration Int?
-
-  expectedStartDate      DateTime?
-  expectedCompletionDate DateTime?
-
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
