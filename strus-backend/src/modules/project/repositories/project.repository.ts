@@ -225,4 +225,21 @@ export class ProjectRepository {
     },
   });
 }
+
+static async transferWorkspace(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  destinationWorkspaceId: string
+): Promise<Project> {
+  return tx.project.update({
+    where: {
+      id: projectId,
+    },
+
+    data: {
+      workspaceId:
+        destinationWorkspaceId,
+    },
+  });
+}
 }

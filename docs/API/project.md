@@ -6,15 +6,18 @@
 
 The Project Module is responsible for managing the complete lifecycle of professional projects within a workspace.
 
-A project represents a professional engagement created by a workspace member and acts as the parent entity for future modules such as Agreements, Milestones, Deliverables, Invoices, Payments, and Activity Tracking.
+A Project represents the existence of work being executed between professionals. It acts as the parent entity for the Agreement Module and future modules such as Milestones, Deliverables, Invoices, Payments, Activity Tracking, and Notifications.
 
-The module provides secure project creation, retrieval, updates, lifecycle management, soft deletion, audit logging, Redis caching, pagination, searching, filtering, and sorting while enforcing strict role-based access control.
+The Project Module is intentionally independent of contractual information. It manages project identity, ownership, lifecycle, authorization, audit logging, Redis caching, pagination, searching, filtering, sorting, and soft deletion, while delegating all commercial and contractual information to the Agreement Module.
+
+Every Project is associated with exactly one Agreement, which is created as part of the same database transaction.
 
 ---
 
 # Objectives
 
 * Allow workspace members to create professional projects.
+* Maintain a clear separation between project lifecycle and contractual information.
 * Allow Workspace Owners and Admins to view all projects within a workspace.
 * Allow Members to view only the projects they have created.
 * Restrict project modification to the project creator.
@@ -22,6 +25,36 @@ The module provides secure project creation, retrieval, updates, lifecycle manag
 * Support efficient retrieval using pagination, searching, filtering, and sorting.
 * Improve read performance through Redis caching.
 * Preserve historical data using soft deletion.
+* Prepare transactional integration with the Agreement Module.
+
+---
+
+# Responsibilities
+
+## Project Module Owns
+
+* Project identity
+* Workspace ownership
+* Project ownership
+* Project lifecycle
+* Project visibility
+* Authorization
+* Audit logging
+* Soft deletion
+
+---
+
+## Agreement Module Owns
+
+* Budget
+* Timeline
+* Scope of work
+* Deliverables
+* Agreement participants
+* Acceptance criteria
+* Commercial terms
+
+The Project Module never stores or manages contractual information.
 
 ---
 
@@ -47,7 +80,11 @@ Supported project states:
 * CANCELLED
 * MUTUALLY_TERMINATED
 
-Status transitions are validated to ensure only valid lifecycle changes are allowed.
+Every project is created in the **DRAFT** state.
+
+Project activation is controlled by the Agreement Module after the agreement has been successfully signed.
+
+Manual activation is not supported.
 
 ---
 
@@ -71,7 +108,7 @@ Status transitions are validated to ensure only valid lifecycle changes are allo
 * View only projects created by themselves.
 * Update only projects they created.
 * Delete only projects they created.
-* Change the status of only projects they created.
+* View audit history of projects they have access to.
 
 ---
 
@@ -81,10 +118,9 @@ Business validation includes:
 
 * Project title validation.
 * Project description validation.
-* Estimated budget validation.
-* Estimated duration validation.
-* Expected start and completion date validation.
 * Project status transition validation.
+
+Contract-related validation is handled exclusively by the Agreement Module.
 
 ---
 
@@ -106,9 +142,33 @@ Each audit entry stores:
 * Metadata
 * Timestamp
 
+Audit records provide complete historical traceability throughout the lifecycle of a project.
+
 ---
 
-## Pagination, Search & Filtering
+# Project–Agreement Relationship
+
+Each Project owns exactly one Agreement.
+
+Relationship:
+
+```text
+Project (1)
+      │
+      │
+      ▼
+Agreement (1)
+```
+
+Business rules:
+
+* A Project cannot exist without an Agreement.
+* An Agreement cannot exist without a Project.
+* Agreement creation is performed within the same database transaction as Project creation.
+
+---
+
+# Pagination, Search & Filtering
 
 Workspace project listing supports:
 
@@ -129,17 +189,14 @@ Workspace project listing supports:
 ### Sorting
 
 * Created Date
-* Updated Date (if enabled)
+* Updated Date
 * Project Title
-* Estimated Budget (if enabled)
-* Expected Start Date
-* Expected Completion Date
 
 Both ascending and descending ordering are supported.
 
 ---
 
-## Redis Caching
+# Redis Caching
 
 Frequently accessed read operations are cached to reduce database load.
 
@@ -158,7 +215,7 @@ Cache invalidation occurs automatically after:
 
 ---
 
-## Soft Deletion
+# Soft Deletion
 
 Projects are never permanently removed.
 
@@ -171,7 +228,7 @@ Deleting a project:
 
 ---
 
-## Performance Optimizations
+# Performance Optimizations
 
 The Project Module includes:
 
@@ -187,7 +244,7 @@ The Project Module includes:
 
 ---
 
-## Design Principles
+# Design Principles
 
 The module follows the same architectural principles as the rest of the backend:
 
@@ -197,9 +254,14 @@ The module follows the same architectural principles as the rest of the backend:
 * Transactional Business Logic
 * Separation of Concerns
 * Role-Based Access Control
+* Cache-Aside Pattern
 * Soft Delete Strategy
 * Immutable Audit Trail
 * Redis Read Caching
+* Single Responsibility Principle
+
+The Project Module is responsible only for project lifecycle management, while the Agreement Module is responsible for all contractual and commercial aspects of the engagement.
+
 
 ####################################################################################################################
 
@@ -209,13 +271,17 @@ The module follows the same architectural principles as the rest of the backend:
 
 The Project Module follows the same layered architecture as every other module in the application.
 
-Each layer has a single responsibility and communicates only with the adjacent layer, ensuring maintainability, scalability, and testability.
+Its responsibility is limited to managing project identity, ownership, lifecycle, authorization, audit logging, and retrieval.
 
-```
+The module intentionally does **not** manage contractual information. Instead, it is designed to integrate transactionally with the Agreement Module, which owns all commercial and contractual data.
+
+Each layer has a single responsibility and communicates only with its adjacent layer, ensuring maintainability, scalability, and testability.
+
+```text
                 HTTP Request
                      │
                      ▼
-                Authentication
+               Authentication
                      │
                      ▼
                   Routes
@@ -228,13 +294,13 @@ Each layer has a single responsibility and communicates only with the adjacent l
    Redis Cache             Project Service
                                  │
                                  ▼
-                        Permission Service
+                      Permission Service
                                  │
                                  ▼
-                           Validator Layer
+                         Validator Layer
                                  │
                                  ▼
-                          Repository Layer
+                        Repository Layer
                                  │
                                  ▼
                            PostgreSQL
@@ -249,9 +315,9 @@ Each layer has a single responsibility and communicates only with the adjacent l
 
 ## Read Operations
 
-All read operations follow a **Cache-Aside** strategy.
+All read operations follow the **Cache-Aside Pattern**.
 
-```
+```text
 Client
    │
    ▼
@@ -286,9 +352,11 @@ This minimizes unnecessary database queries while ensuring frequently accessed d
 
 ## Write Operations
 
-Create, Update, Delete, and Status Change operations always execute inside a database transaction.
+Every write operation executes inside a Prisma transaction.
 
-```
+Current implementation:
+
+```text
 Client
    │
    ▼
@@ -304,10 +372,10 @@ Business Validation
 Permission Validation
    │
    ▼
-Database Update
+Create / Update Project
    │
    ▼
-Audit Log Creation
+Create Audit Log
    │
    ▼
 Commit Transaction
@@ -319,7 +387,40 @@ Redis Cache Invalidation
 Return Response
 ```
 
-Cache invalidation occurs **only after a successful transaction commit**, ensuring cache consistency.
+---
+
+## Future Project Creation Flow
+
+The Project Module is already prepared for Agreement integration.
+
+The final transactional flow will become:
+
+```text
+BEGIN TRANSACTION
+        │
+        ▼
+Create Project
+        │
+        ▼
+Create Draft Agreement
+        │
+        ▼
+Create Agreement Participants
+        │
+        ▼
+Create Project Audit
+        │
+        ▼
+COMMIT
+```
+
+If any operation fails:
+
+```text
+ROLLBACK ENTIRE TRANSACTION
+```
+
+This guarantees that a Project and its Agreement are always created together.
 
 ---
 
@@ -341,11 +442,11 @@ Routes contain no business logic.
 
 Responsible for:
 
-* Parsing requests.
+* Parsing HTTP requests.
 * DTO validation.
 * Reading from Redis cache.
 * Invoking services.
-* Writing successful responses.
+* Returning API responses.
 * Populating Redis cache.
 
 Controllers never communicate directly with the database.
@@ -358,12 +459,13 @@ Responsible for all business logic.
 
 Responsibilities include:
 
-* Permission enforcement.
-* Project lifecycle validation.
-* Business rule validation.
+* Project lifecycle management.
+* Authorization orchestration.
+* Business validation.
 * Transaction orchestration.
 * Audit log creation.
 * Repository coordination.
+* Preparing transactional hooks for Agreement creation.
 
 Services never perform HTTP-related operations.
 
@@ -371,7 +473,7 @@ Services never perform HTTP-related operations.
 
 ## Permission Service
 
-Responsible for enforcing authorization rules.
+Responsible for authorization.
 
 Validates:
 
@@ -380,32 +482,31 @@ Validates:
 * Project ownership.
 * Update permissions.
 * Delete permissions.
-* Status change permissions.
+* Status update permissions.
 
-Centralizing authorization avoids duplicated permission logic across services.
+Permission logic is centralized to avoid duplication.
 
 ---
 
-## Validators
+## Validator Layer
 
-Responsible for validating business constraints.
+Responsible for business validation.
 
-Examples include:
+Validation includes:
 
-* Project title validation.
-* Description validation.
-* Budget validation.
-* Duration validation.
-* Expected date validation.
-* Status transition validation.
+* Project title.
+* Project description.
+* Project status transitions.
+
+Contractual validation is intentionally excluded and belongs to the Agreement Module.
 
 ---
 
 ## Repository Layer
 
-Responsible only for database access.
+Responsible only for persistence.
 
-Operations include:
+Responsibilities include:
 
 * CRUD operations.
 * Pagination.
@@ -413,7 +514,7 @@ Operations include:
 * Filtering.
 * Sorting.
 * Soft deletion.
-* Membership lookup.
+* Workspace membership lookup.
 
 Repositories contain no business rules.
 
@@ -421,13 +522,13 @@ Repositories contain no business rules.
 
 ## Mapper Layer
 
-Responsible for transforming Prisma entities into API response objects.
+Responsible for converting Prisma entities into API response objects.
 
 Benefits include:
 
-* Preventing accidental exposure of internal fields.
 * Consistent API responses.
-* Decoupling database models from external contracts.
+* Encapsulation of database models.
+* Prevention of accidental exposure of internal fields.
 
 ---
 
@@ -441,9 +542,11 @@ The Project Module caches frequently accessed read operations.
 * Workspace Project Listings
 * Project Audit Logs
 
+---
+
 ### Cache Keys
 
-```
+```text
 project:{projectId}
 
 workspace:{workspaceId}:projects:{queryHash}
@@ -451,14 +554,16 @@ workspace:{workspaceId}:projects:{queryHash}
 project:{projectId}:audits:{queryHash}
 ```
 
+---
+
 ### Cache Strategy
 
-The module follows the **Cache-Aside Pattern**.
+The Project Module follows the **Cache-Aside Pattern**.
 
-* Check Redis first.
+* Read Redis first.
 * Query PostgreSQL on cache miss.
-* Store the response in Redis.
-* Return the cached response on subsequent requests.
+* Store response in Redis.
+* Serve cached responses on subsequent requests.
 
 ---
 
@@ -504,36 +609,61 @@ Invalidates:
 
 # Database Transactions
 
-The following operations execute inside a single Prisma transaction:
+The following operations execute inside a single transaction:
 
 * Create Project
 * Update Project
 * Delete Project
 * Update Project Status
 
-This guarantees:
+Future versions will extend the Create Project transaction to include Agreement creation without changing the Project architecture.
 
-* Atomic writes.
-* Consistent audit logs.
-* Rollback on failure.
-* Data integrity.
+---
+
+# Architectural Boundaries
+
+## Project Module Owns
+
+* Project identity
+* Project ownership
+* Lifecycle
+* Authorization
+* Audit logging
+* Soft deletion
+
+---
+
+## Agreement Module Owns
+
+* Budget
+* Timeline
+* Scope
+* Deliverables
+* Participants
+* Acceptance criteria
+* Commercial terms
+
+The Project Module never stores or validates contractual information.
 
 ---
 
 # Design Principles
 
-The Project Module adheres to the following principles:
+The Project Module adheres to:
 
 * Layered Architecture
 * Repository Pattern
 * Service Layer Pattern
 * Cache-Aside Pattern
 * Transactional Consistency
-* Soft Delete Strategy
-* Immutable Audit Logging
-* Role-Based Authorization
 * Separation of Concerns
 * Single Responsibility Principle
+* Role-Based Authorization
+* Immutable Audit Logging
+* Redis Read Caching
+* Soft Delete Strategy
+
+The architecture is intentionally designed so that future modules, beginning with the Agreement Module, can be integrated without requiring structural changes to the Project Module.
 
 ####################################################################################################################
 
@@ -546,141 +676,185 @@ The Project Module introduces two primary entities:
 * Project
 * Project Audit
 
-Projects belong to a workspace and are created by a workspace member.
+A Project represents the existence of professional work within a workspace.
 
-Every important project operation generates an immutable audit record, enabling complete traceability throughout the project lifecycle.
+It is intentionally lightweight and stores only project identity, ownership, and lifecycle information.
+
+Every Project owns exactly one Agreement, while every significant project operation generates an immutable audit record for complete traceability.
 
 ---
 
 # Entity Relationship Diagram
 
-```text
-User
- │
- │ creates
- ▼
-Project
- │
- │ belongs to
- ▼
+```text id="3gbk42"
 Workspace
-
-Project
- │
- │ has many
- ▼
-ProjectAudit
-
-User
- │
- │ performs
- ▼
-ProjectAudit
+    │
+    │
+    ▼
+ Project
+    │
+    ├──────────────┐
+    │              │
+    ▼              ▼
+Agreement     ProjectAudit
+                  ▲
+                  │
+                  │
+                 User
 ```
 
 ---
 
-# Database Relationships
+# Core Relationships
 
-## Workspace → Projects
+## Workspace → Project
 
 Relationship
 
-```
+```text id="m7hk3j"
 One Workspace
       │
       ▼
 Many Projects
 ```
 
-Every project belongs to exactly one workspace.
+Every Project belongs to exactly one Workspace.
 
-A workspace can contain multiple projects.
+A Workspace may contain multiple Projects.
 
 ---
 
-## User → Projects
+## User → Project
 
 Relationship
 
-```
+```text id="vu1pwr"
 One User
       │
       ▼
 Many Projects
 ```
 
-A user can create multiple projects.
+Every Project has exactly one creator.
 
-Each project has exactly one creator.
+A user may create multiple projects.
 
 ---
 
-## Project → Project Audits
+## Project → Agreement
 
 Relationship
 
+```text id="nprkvj"
+Project (1)
+      │
+      ▼
+Agreement (1)
 ```
+
+Business Rules
+
+* Every Project owns exactly one Agreement.
+* Every Agreement belongs to exactly one Project.
+* Agreement references Project using:
+
+```text id="afn1m5"
+Agreement.projectId (UNIQUE)
+```
+
+The Project table does **not** contain an `agreementId`.
+
+Agreement creation occurs within the same database transaction as Project creation.
+
+---
+
+## Project → Project Audit
+
+Relationship
+
+```text id="gy41ci"
 One Project
       │
       ▼
 Many Audit Logs
 ```
 
-Every significant project action creates an audit record.
+Every significant project operation creates a new immutable audit record.
 
-Audit records are immutable and permanently preserved.
+Audit history is never modified or deleted.
 
 ---
 
-## User → Project Audits
+## User → Project Audit
 
 Relationship
 
-```
+```text id="nq5qgs"
 One User
       │
       ▼
 Many Audit Logs
 ```
 
-Each audit stores the user responsible for the action.
+Each audit entry records the user responsible for performing the action.
 
 ---
 
 # Project Table
 
-| Column                 | Type      | Description                  |
-| ---------------------- | --------- | ---------------------------- |
-| id                     | UUID      | Primary Key                  |
-| workspaceId            | UUID      | Parent workspace             |
-| createdById            | UUID      | User who created the project |
-| title                  | String    | Project title                |
-| description            | String?   | Optional description         |
-| status                 | Enum      | Current lifecycle state      |
-| estimatedBudget        | Decimal?  | Optional estimated budget    |
-| estimatedDuration      | Integer?  | Estimated duration (days)    |
-| expectedStartDate      | DateTime? | Planned start date           |
-| expectedCompletionDate | DateTime? | Planned completion date      |
-| createdAt              | DateTime  | Creation timestamp           |
-| updatedAt              | DateTime  | Last modification timestamp  |
-| deletedAt              | DateTime? | Soft delete timestamp        |
+| Column      | Type      | Description                  |
+| ----------- | --------- | ---------------------------- |
+| id          | UUID      | Primary Key                  |
+| workspaceId | UUID      | Parent Workspace             |
+| createdById | UUID      | Project Creator              |
+| title       | String    | Project title                |
+| description | String?   | Optional project description |
+| status      | Enum      | Project lifecycle            |
+| createdAt   | DateTime  | Creation timestamp           |
+| updatedAt   | DateTime  | Last modification timestamp  |
+| deletedAt   | DateTime? | Soft delete timestamp        |
+
+The Project entity intentionally excludes all contractual information.
+
+---
+
+# Agreement Ownership
+
+The following information is **not stored** in the Project table:
+
+* Budget
+* Timeline
+* Expected Start Date
+* Expected Completion Date
+* Deliverables
+* Scope of Work
+* Acceptance Criteria
+* Participants
+
+These fields belong exclusively to the Agreement Module.
 
 ---
 
 # Project Status Enum
 
-```text
+```text id="m5b9wd"
 DRAFT
 
 ACTIVE
 
 COMPLETED
 
-CANCELLED
-
 MUTUALLY_TERMINATED
+
+CANCELLED
 ```
+
+Business Rules
+
+* Every Project starts as `DRAFT`.
+* Projects cannot be manually activated.
+* Agreement signing is responsible for transitioning the Project to `ACTIVE`.
+* Completed, Cancelled, and Mutually Terminated projects are terminal states.
 
 ---
 
@@ -689,24 +863,26 @@ MUTUALLY_TERMINATED
 | Column    | Type     | Description                |
 | --------- | -------- | -------------------------- |
 | id        | UUID     | Primary Key                |
-| projectId | UUID     | Related project            |
+| projectId | UUID     | Related Project            |
 | actorId   | UUID     | User performing the action |
 | action    | Enum     | Audit action               |
-| metadata  | JSON     | Additional information     |
+| metadata  | JSON     | Additional metadata        |
 | createdAt | DateTime | Audit timestamp            |
+
+Audit records are immutable.
 
 ---
 
 # Project Audit Actions
 
-```text
+```text id="ddkhps"
 CREATED
 
 UPDATED
 
-DELETED
-
 STATUS_CHANGED
+
+DELETED
 ```
 
 ---
@@ -722,6 +898,14 @@ STATUS_CHANGED
 
 ---
 
+## Agreement
+
+| Column    | References | On Delete                     |
+| --------- | ---------- | ----------------------------- |
+| projectId | Project.id | CASCADE (Unique Relationship) |
+
+---
+
 ## Project Audit
 
 | Column    | References | On Delete |
@@ -731,7 +915,7 @@ STATUS_CHANGED
 
 ---
 
-# Indexes
+# Database Indexes
 
 ## Project
 
@@ -757,298 +941,536 @@ STATUS_CHANGED
 
 # Soft Delete Strategy
 
-Projects are never physically removed.
+Projects are never physically deleted.
 
 Deletion updates only:
 
-```text
+```text id="l4l8eg"
 deletedAt = Current Timestamp
 ```
 
-Queries automatically exclude records where:
+All repository queries automatically exclude deleted records.
 
-```sql
-deletedAt IS NOT NULL
+```sql id="lk2jji"
+WHERE deletedAt IS NULL
 ```
 
 Benefits include:
 
-* Audit preservation
-* Historical reporting
+* Historical preservation
+* Complete audit history
 * Future restoration capability
 * Referential integrity
 
 ---
 
+# Transactional Consistency
+
+Project creation is designed for transactional expansion.
+
+Current transaction:
+
+```text id="9ptwte"
+Create Project
+      │
+      ▼
+Create Project Audit
+```
+
+Future transaction:
+
+```text id="i9pxea"
+Create Project
+      │
+      ▼
+Create Agreement
+      │
+      ▼
+Create Agreement Participants
+      │
+      ▼
+Create Project Audit
+```
+
+The entire transaction succeeds or fails as a single atomic operation.
+
+---
+
 # Data Integrity Rules
 
-The Project Module enforces the following constraints:
+The Project Module guarantees:
 
-* Every project belongs to a valid workspace.
-* Every project has exactly one creator.
-* Every audit record belongs to a valid project.
+* Every Project belongs to a valid Workspace.
+* Every Project has exactly one creator.
+* Every Project owns exactly one Agreement.
+* Every Agreement belongs to exactly one Project.
+* Every audit record belongs to a valid Project.
 * Every audit record records the acting user.
-* Deleted projects remain available for audit history.
-* Invalid status transitions are rejected.
-* Project updates and deletions are restricted to the project creator.
-* Workspace Owners and Admins can view all projects.
-* Workspace Members can view only their own projects.
+* Deleted Projects remain available for audit history.
+* Invalid lifecycle transitions are rejected.
+* Project updates and deletions are restricted to the Project creator.
+* Workspace Owners and Admins can view all Projects.
+* Workspace Members can view only Projects they created.
+* Contractual information is never stored in the Project entity.
 
 ####################################################################################################################
 
 # Phase 4 — Business Rules & Authorization
 
-## Overview
+# Overview
 
-The Project Module enforces strict business rules to ensure only authorized workspace members can create, view, modify, or manage projects.
+The Project Module enforces business rules that govern project ownership, lifecycle, visibility, authorization, and transactional consistency.
 
-Authorization is handled centrally through the `ProjectPermissionService`, preventing permission logic from being duplicated across controllers and services.
+A Project represents professional work only.
 
----
-
-# Workspace Membership
-
-Only users who are members of a workspace can access its projects.
-
-If a user is not a member of the workspace:
-
-* Project creation is denied.
-* Project listing is denied.
-* Project retrieval is denied.
-* Project updates are denied.
-* Project deletion is denied.
-* Status updates are denied.
-* Audit log access is denied.
+All contractual and commercial information belongs exclusively to the Agreement Module.
 
 ---
 
-# Project Creation
+# Project Ownership
 
-A project can only be created when:
+## Project Creator
 
-* The workspace exists.
-* The user is a member of the workspace.
-* Project data passes validation.
+Every project has exactly one creator.
 
-Upon successful creation:
+The creator is recorded using:
 
-* The project is created with `DRAFT` status.
-* The creator is recorded.
-* An audit log is generated.
-* Workspace project list cache is invalidated.
+```text
+createdById
+```
+
+The creator remains unchanged throughout the lifetime of the project.
+
+Project ownership cannot be transferred.
 
 ---
 
-# Project Visibility
+## Workspace Ownership
 
-Project visibility depends on the user's workspace role.
+Every project belongs to exactly one workspace.
+
+Relationship
+
+```text
+Workspace (1)
+      │
+      ▼
+Project (N)
+```
+
+Projects cannot be moved between workspaces.
+
+---
+
+# Project Lifecycle
+
+Supported lifecycle states:
+
+```text
+DRAFT
+
+ACTIVE
+
+COMPLETED
+
+MUTUALLY_TERMINATED
+
+CANCELLED
+```
+
+---
+
+## Initial State
+
+Every newly created project starts as:
+
+```text
+DRAFT
+```
+
+No other initial status is allowed.
+
+---
+
+## Lifecycle Rules
+
+### DRAFT
+
+A project has been created but work has not officially started.
+
+Characteristics
+
+* Project exists.
+* Agreement is still being prepared or negotiated.
+* No contractual obligations are active.
+* Project information may still be updated.
+
+---
+
+### ACTIVE
+
+A project becomes active only after its Agreement has been signed.
+
+Manual activation is not permitted.
+
+Future flow
+
+```text
+Agreement Signed
+        │
+        ▼
+Project Status
+        │
+        ▼
+ACTIVE
+```
+
+The Project Module is prepared for this integration.
+
+---
+
+### COMPLETED
+
+Represents successful completion of the project.
+
+No further status changes are allowed.
+
+---
+
+### MUTUALLY_TERMINATED
+
+Represents termination by mutual agreement.
+
+No further status changes are allowed.
+
+---
+
+### CANCELLED
+
+Represents cancellation before work begins.
+
+No further status changes are allowed.
+
+---
+
+# Allowed Status Transitions
+
+```text
+DRAFT
+ ├────────► ACTIVE
+ └────────► CANCELLED
+
+ACTIVE
+ ├────────► COMPLETED
+ └────────► MUTUALLY_TERMINATED
+```
+
+---
+
+# Invalid Status Transitions
+
+The following transitions are rejected.
+
+```text
+ACTIVE
+        │
+        ▼
+DRAFT
+
+COMPLETED
+        │
+        ▼
+Any Status
+
+CANCELLED
+        │
+        ▼
+Any Status
+
+MUTUALLY_TERMINATED
+        │
+        ▼
+Any Status
+
+DRAFT
+        │
+        ▼
+COMPLETED
+
+DRAFT
+        │
+        ▼
+MUTUALLY_TERMINATED
+```
+
+Rejected requests return a business validation error.
+
+---
+
+# Agreement Integration Rules
+
+Every Project must own exactly one Agreement.
+
+Relationship
+
+```text
+Project (1)
+      │
+      ▼
+Agreement (1)
+```
+
+Business Rules
+
+* Project cannot exist without an Agreement.
+* Agreement cannot exist without a Project.
+* Agreement references Project using a unique `projectId`.
+* Project does not contain an `agreementId`.
+
+Agreement creation will occur inside the same transaction as Project creation.
+
+---
+
+# Project Responsibilities
+
+The Project Module owns only:
+
+* Project identity
+* Workspace ownership
+* Project ownership
+* Project lifecycle
+* Authorization
+* Audit history
+
+---
+
+# Agreement Responsibilities
+
+The Agreement Module owns:
+
+* Scope of work
+* Budget
+* Timeline
+* Deliverables
+* Participants
+* Acceptance criteria
+* Commercial terms
+
+These responsibilities never overlap.
+
+---
+
+# Authorization Model
+
+Authorization is enforced using the `ProjectPermissionService`.
+
+---
 
 ## Workspace Owner
 
-Can:
+Permissions
 
-* View every project in the workspace.
-* View project details.
-* View project audit history.
+* Create Project
+* View all Projects
+* View Project Details
+* View Audit Logs
 
-Cannot:
+Project ownership is still respected.
 
-* Edit projects created by other members.
-* Delete projects created by other members.
-* Change the status of projects created by other members.
+Owners cannot edit or delete projects created by other users.
 
 ---
 
 ## Workspace Admin
 
-Can:
+Permissions
 
-* View every project in the workspace.
-* View project details.
-* View project audit history.
+* Create Project
+* View all Projects
+* View Project Details
+* View Audit Logs
 
-Cannot:
-
-* Edit projects created by other members.
-* Delete projects created by other members.
-* Change the status of projects created by other members.
+Admins cannot edit or delete projects they did not create.
 
 ---
 
 ## Workspace Member
 
-Can:
+Permissions
 
-* Create projects.
-* View only projects they created.
-* View details of their own projects.
-* View audit history of their own projects.
-
-Cannot:
-
-* View projects created by other members.
-* Modify projects created by others.
-* Delete projects created by others.
-* Change the status of projects created by others.
+* Create Project
+* View own Projects
+* View own Project Details
+* Update own Projects
+* Delete own Projects
+* View Audit Logs for accessible Projects
 
 ---
 
-# Project Updates
+# Project Creation Rules
 
-A project can only be updated when:
+Project creation requires:
 
-* The project exists.
-* The project is not soft deleted.
-* The requesting user is the project creator.
-* The project is in `DRAFT` status.
+* Authenticated user
+* Valid workspace membership
+* Valid project title
+* Valid project description
 
-On success:
+Future transactional flow
 
-* Project information is updated.
-* Audit log is created.
-* Related caches are invalidated.
+```text
+BEGIN TRANSACTION
+        │
+        ▼
+Create Project
+        │
+        ▼
+Create Draft Agreement
+        │
+        ▼
+Create Agreement Participants
+        │
+        ▼
+Create Project Audit
+        │
+        ▼
+COMMIT
+```
+
+Failure of any step results in a complete rollback.
 
 ---
 
-# Project Deletion
+# Project Update Rules
 
-Projects use soft deletion.
+Only the Project creator may update a project.
 
-Deletion is allowed only when:
+Editable fields
 
-* The project exists.
-* The requesting user is the project creator.
-* The project is still in `DRAFT` status.
+* Title
+* Description
+
+The following cannot be updated through the Project Module:
+
+* Budget
+* Timeline
+* Scope
+* Deliverables
+* Participants
+* Acceptance criteria
+
+These belong to the Agreement Module.
+
+---
+
+# Project Deletion Rules
+
+Deletion is implemented as a soft delete.
 
 Deletion:
 
-* Sets `deletedAt`.
-* Preserves historical data.
-* Preserves audit history.
-* Invalidates related caches.
+* Sets `deletedAt`
+* Preserves audit history
+* Preserves Agreement relationship
+* Removes the project from active queries
+
+Only the Project creator may delete a project.
 
 ---
 
-# Project Status Changes
+# Project Visibility Rules
 
-Only the project creator can change the project status.
+Workspace Owner
 
-Allowed transitions:
+* Can view every project in the workspace.
 
-```text
-DRAFT
- ├──► ACTIVE
- └──► CANCELLED
+Workspace Admin
 
-ACTIVE
- ├──► COMPLETED
- └──► MUTUALLY_TERMINATED
-```
+* Can view every project in the workspace.
 
-The following transitions are rejected:
+Workspace Member
 
-* COMPLETED → Any Status
-* CANCELLED → Any Status
-* MUTUALLY_TERMINATED → Any Status
-* ACTIVE → DRAFT
-* DRAFT → COMPLETED
-* DRAFT → MUTUALLY_TERMINATED
-
-Every successful status change creates an audit record.
+* Can view only projects they created.
 
 ---
 
-# Audit Logging
+# Audit Logging Rules
 
-The following actions are automatically audited:
+Every significant operation generates an immutable audit entry.
+
+Recorded events:
 
 * Project Created
 * Project Updated
-* Project Deleted
 * Project Status Changed
+* Project Deleted
 
 Each audit record stores:
 
-* Project ID
-* Actor ID
+* Project
+* Actor
 * Action
 * Metadata
 * Timestamp
 
-Audit records are immutable and cannot be modified or deleted.
+Audit records cannot be modified or deleted.
 
 ---
 
-# Validation Rules
+# Business Validation Rules
 
-The module validates:
-
-## Title
+Project title
 
 * Required
-* Trimmed
-* Length validation
+* Trimmed before storage
+* Must satisfy configured length constraints
 
----
-
-## Description
+Project description
 
 * Optional
-* Trimmed
-* Maximum length validation
+* Trimmed before storage
+* Must satisfy configured maximum length
+
+Project status
+
+* Must follow allowed lifecycle transitions
+* Invalid transitions are rejected
+
+Contractual validation is intentionally excluded from the Project Module.
 
 ---
 
-## Estimated Budget
+# Soft Delete Rules
 
-* Optional
-* Positive value only
+Projects are never permanently removed.
 
----
+Repository queries automatically exclude:
 
-## Estimated Duration
+```sql
+deletedAt IS NOT NULL
+```
 
-* Optional
-* Positive integer
+Historical data remains available for:
 
----
-
-## Expected Dates
-
-If both dates are provided:
-
-* Completion date must be later than start date.
+* Audit history
+* Reporting
+* Future restoration
 
 ---
 
-# Error Conditions
+# Business Principles
 
-Requests are rejected when:
+The Project Module follows these principles:
 
-* Workspace does not exist.
-* User is not a workspace member.
-* Project does not exist.
-* Project is soft deleted.
-* User is not the project creator.
-* Invalid project status transition.
-* Invalid input data.
-* Validation rules fail.
-
----
-
-# Business Guarantees
-
-The Project Module guarantees:
-
-* Every project belongs to a valid workspace.
-* Every project has a single creator.
-* Only the creator can modify project data.
-* Owners and Admins have read access to all workspace projects.
-* Members have read access only to their own projects.
-* Every write operation generates an audit log.
-* Invalid lifecycle transitions are prevented.
-* Soft deletion preserves historical information.
-* Authorization rules are enforced consistently through the permission service.
+* A Project represents work, not a contract.
+* Commercial information belongs exclusively to the Agreement Module.
+* Authorization is centralized.
+* Business validation is centralized.
+* Audit history is immutable.
+* Every write operation is transactional.
+* Redis caching improves read performance.
+* Soft deletion preserves historical integrity.
+* Project and Agreement maintain a mandatory one-to-one relationship.
 
 ####################################################################################################################
 
@@ -1056,20 +1478,32 @@ The Project Module guarantees:
 
 ## Overview
 
-The Project Module exposes RESTful APIs for project management, project lifecycle management, and audit log retrieval.
+The Project Module exposes RESTful APIs for managing projects, project lifecycle, and project audit history.
 
-All endpoints require authentication using a valid JWT access token.
-
-```
-Authorization: Bearer <ACCESS_TOKEN>
-```
+All endpoints require authentication using a valid JWT Access Token.
 
 ---
 
 # Base URL
 
-```
+```text id="r2t81d"
 /api/v1/project
+```
+
+---
+
+# Authentication
+
+Every request must include:
+
+```text id="7c4z6e"
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+Unauthenticated requests return:
+
+```http id="hh8jhm"
+401 Unauthorized
 ```
 
 ---
@@ -1078,52 +1512,62 @@ Authorization: Bearer <ACCESS_TOKEN>
 
 ## Endpoint
 
-```
+```text id="rtn9oq"
 POST /workspaces/:workspaceId/projects
 ```
 
-### Description
+## Description
 
 Creates a new project inside the specified workspace.
 
-### Authorization
+The project is always created in the **DRAFT** state.
+
+Agreement creation is prepared to occur within the same transaction in the Agreement Module.
+
+---
+
+## Authorization
 
 Authenticated Workspace Member
 
-### Path Parameters
+---
+
+## Path Parameters
 
 | Parameter   | Type | Description          |
 | ----------- | ---- | -------------------- |
-| workspaceId | UUID | Workspace identifier |
+| workspaceId | UUID | Workspace Identifier |
 
-### Request Body
+---
 
-```json
+## Request Body
+
+```json id="jlwmwr"
 {
   "title": "Portfolio Website",
-  "description": "Personal client project",
-  "estimatedBudget": 50000,
-  "estimatedDuration": 30,
-  "expectedStartDate": "2026-07-10T00:00:00.000Z",
-  "expectedCompletionDate": "2026-08-10T00:00:00.000Z"
+  "description": "Personal client project"
 }
 ```
 
-### Success Response
+---
+
+## Success Response
 
 **201 Created**
 
-```json
+```json id="m4wzms"
 {
   "success": true,
   "message": "Project created successfully.",
   "data": {
-    "id": "...",
-    "workspaceId": "...",
-    "createdById": "...",
+    "id": "uuid",
+    "workspaceId": "uuid",
+    "createdById": "uuid",
     "title": "Portfolio Website",
     "description": "Personal client project",
-    "status": "DRAFT"
+    "status": "DRAFT",
+    "createdAt": "...",
+    "updatedAt": "..."
   }
 }
 ```
@@ -1134,38 +1578,66 @@ Authenticated Workspace Member
 
 ## Endpoint
 
-```
+```text id="0d2wqs"
 GET /workspaces/:workspaceId/projects
 ```
 
-### Description
+---
+
+## Description
 
 Returns paginated projects visible to the authenticated user.
 
-### Authorization
+Workspace Owners and Admins receive every project.
+
+Workspace Members receive only projects they created.
+
+---
+
+## Authorization
 
 Authenticated Workspace Member
 
-### Query Parameters
+---
 
-| Parameter | Type   | Default   | Description                    |
-| --------- | ------ | --------- | ------------------------------ |
-| page      | Number | 1         | Page number                    |
-| limit     | Number | 20        | Records per page               |
-| search    | String | —         | Search by title or description |
-| status    | Enum   | —         | Filter by project status       |
-| sort      | Enum   | createdAt | Sort field                     |
-| order     | Enum   | desc      | asc / desc                     |
+## Query Parameters
 
-### Example
+| Parameter | Type   | Default   | Description                |
+| --------- | ------ | --------- | -------------------------- |
+| page      | Number | 1         | Page Number                |
+| limit     | Number | 20        | Page Size                  |
+| search    | String | —         | Search Title & Description |
+| status    | Enum   | —         | Filter by Status           |
+| sort      | Enum   | createdAt | Sort Field                 |
+| order     | Enum   | desc      | asc / desc                 |
 
+---
+
+## Supported Sort Fields
+
+```text id="5wzb4s"
+createdAt
+
+updatedAt
+
+title
+
+status
 ```
+
+---
+
+## Example
+
+```text id="ayymnj"
 GET /workspaces/{workspaceId}/projects?page=1&limit=20&status=ACTIVE&search=website&sort=createdAt&order=desc
 ```
 
-### Success Response
+---
 
-```json
+## Success Response
+
+```json id="v7gr1d"
 {
   "success": true,
   "data": {
@@ -1187,31 +1659,44 @@ GET /workspaces/{workspaceId}/projects?page=1&limit=20&status=ACTIVE&search=webs
 
 ## Endpoint
 
-```
+```text id="6j07ea"
 GET /projects/:projectId
 ```
 
-### Description
+---
+
+## Description
 
 Returns complete information for a single project.
 
-### Authorization
+---
 
-Authenticated Workspace Member with project access.
+## Authorization
 
-### Path Parameters
+Authenticated user with access to the project.
+
+---
+
+## Path Parameters
 
 | Parameter | Type |
 | --------- | ---- |
 | projectId | UUID |
 
-### Success Response
+---
 
-```json
+## Success Response
+
+```json id="2zwj91"
 {
   "success": true,
   "data": {
-    "...": "project details"
+    "id": "...",
+    "workspaceId": "...",
+    "createdById": "...",
+    "title": "...",
+    "description": "...",
+    "status": "ACTIVE"
   }
 }
 ```
@@ -1222,30 +1707,42 @@ Authenticated Workspace Member with project access.
 
 ## Endpoint
 
-```
+```text id="8gtsv8"
 PATCH /projects/:projectId
 ```
 
-### Description
+---
 
-Updates an existing project.
+## Description
 
-### Authorization
+Updates editable project information.
+
+Only project metadata can be modified.
+
+Contractual information is managed by the Agreement Module.
+
+---
+
+## Authorization
 
 Project Creator
 
-### Request Body
+---
 
-```json
+## Request Body
+
+```json id="w13jb2"
 {
-  "title": "Updated Project",
-  "estimatedBudget": 75000
+  "title": "Updated Project Title",
+  "description": "Updated description"
 }
 ```
 
-### Success Response
+---
 
-```json
+## Success Response
+
+```json id="ifz1pi"
 {
   "success": true,
   "message": "Project updated successfully.",
@@ -1259,21 +1756,29 @@ Project Creator
 
 ## Endpoint
 
-```
+```text id="jlwm0g"
 DELETE /projects/:projectId
 ```
 
-### Description
+---
+
+## Description
 
 Soft deletes a project.
 
-### Authorization
+Deleted projects are excluded from active queries while preserving historical records.
+
+---
+
+## Authorization
 
 Project Creator
 
-### Success Response
+---
 
-```json
+## Success Response
+
+```json id="qyxwzo"
 {
   "success": true,
   "message": "Project deleted successfully."
@@ -1286,41 +1791,69 @@ Project Creator
 
 ## Endpoint
 
-```
+```text id="klxg4g"
 PATCH /projects/:projectId/status
 ```
 
-### Description
+---
 
-Changes the lifecycle state of a project.
+## Description
 
-### Authorization
+Updates the lifecycle status of a project.
+
+This endpoint exists for lifecycle management, but **ACTIVE** is intended to be set automatically after Agreement signing.
+
+---
+
+## Authorization
 
 Project Creator
 
-### Request Body
+---
 
-```json
+## Request Body
+
+```json id="pq1qvg"
 {
-  "status": "ACTIVE"
+  "status": "COMPLETED"
 }
 ```
 
-### Allowed Transitions
+---
 
-```
+## Allowed Statuses
+
+```text id="ffjlwm"
 DRAFT
- ├──► ACTIVE
- └──► CANCELLED
 
 ACTIVE
- ├──► COMPLETED
- └──► MUTUALLY_TERMINATED
+
+COMPLETED
+
+MUTUALLY_TERMINATED
+
+CANCELLED
 ```
 
-### Success Response
+---
 
-```json
+## Lifecycle
+
+```text id="tjqz2x"
+DRAFT
+ ├────► ACTIVE
+ └────► CANCELLED
+
+ACTIVE
+ ├────► COMPLETED
+ └────► MUTUALLY_TERMINATED
+```
+
+---
+
+## Success Response
+
+```json id="tqb8m5"
 {
   "success": true,
   "message": "Project status updated successfully.",
@@ -1334,36 +1867,46 @@ ACTIVE
 
 ## Endpoint
 
-```
+```text id="4jlwmv"
 GET /projects/:projectId/audits
 ```
 
-### Description
+---
+
+## Description
 
 Returns paginated audit history for a project.
 
-### Authorization
+---
 
-Users with access to the project.
+## Authorization
 
-### Query Parameters
+Authenticated user with access to the project.
+
+---
+
+## Query Parameters
 
 | Parameter | Type   | Default | Description            |
 | --------- | ------ | ------- | ---------------------- |
-| page      | Number | 1       | Page number            |
-| limit     | Number | 20      | Records per page       |
-| action    | Enum   | —       | Filter by audit action |
+| page      | Number | 1       | Page Number            |
+| limit     | Number | 20      | Records Per Page       |
+| action    | Enum   | —       | Filter by Audit Action |
 | order     | Enum   | desc    | asc / desc             |
 
-### Example
+---
 
-```
+## Example
+
+```text id="czhkgx"
 GET /projects/{projectId}/audits?page=1&limit=20&action=UPDATED
 ```
 
-### Success Response
+---
 
-```json
+## Success Response
+
+```json id="jlwmgc"
 {
   "success": true,
   "data": {
@@ -1371,8 +1914,8 @@ GET /projects/{projectId}/audits?page=1&limit=20&action=UPDATED
     "pagination": {
       "page": 1,
       "limit": 20,
-      "total": 45,
-      "totalPages": 3,
+      "total": 25,
+      "totalPages": 2,
       "hasNext": true
     }
   }
@@ -1381,24 +1924,23 @@ GET /projects/{projectId}/audits?page=1&limit=20&action=UPDATED
 
 ---
 
-# HTTP Status Codes
+# API Permissions
 
-| Status | Meaning                           |
-| ------ | --------------------------------- |
-| 200    | Success                           |
-| 201    | Resource Created                  |
-| 400    | Validation or Business Rule Error |
-| 401    | Authentication Required           |
-| 403    | Permission Denied                 |
-| 404    | Resource Not Found                |
-| 409    | Conflict                          |
-| 500    | Internal Server Error             |
+| Endpoint                | Member              | Admin        | Owner        |
+| ----------------------- | ------------------- | ------------ | ------------ |
+| Create Project          | ✅                   | ✅            | ✅            |
+| List Workspace Projects | Own Projects        | All Projects | All Projects |
+| Get Project             | Accessible Projects | All Projects | All Projects |
+| Update Project          | Creator Only        | Creator Only | Creator Only |
+| Delete Project          | Creator Only        | Creator Only | Creator Only |
+| Update Status           | Creator Only        | Creator Only | Creator Only |
+| View Audit Logs         | Accessible Projects | All Projects | All Projects |
 
 ---
 
-# Caching
+# Redis Cached Endpoints
 
-The following endpoints use Redis caching:
+The following endpoints are cached using Redis.
 
 | Endpoint                              | Cache |
 | ------------------------------------- | ----- |
@@ -1406,54 +1948,96 @@ The following endpoints use Redis caching:
 | GET /workspaces/:workspaceId/projects | ✅     |
 | GET /projects/:projectId/audits       | ✅     |
 
-Cache entries are automatically invalidated after:
+Cache is automatically invalidated after:
 
-* Project creation
-* Project update
-* Project deletion
-* Project status change
+* Project Creation
+* Project Update
+* Project Deletion
+* Project Status Change
 
 ---
 
-# Pagination Format
+# HTTP Status Codes
 
-Every paginated endpoint returns:
+| Status | Description           |
+| ------ | --------------------- |
+| 200    | Request Successful    |
+| 201    | Resource Created      |
+| 400    | Validation Error      |
+| 401    | Unauthorized          |
+| 403    | Forbidden             |
+| 404    | Resource Not Found    |
+| 409    | Conflict              |
+| 500    | Internal Server Error |
 
-```json
-{
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 150,
-    "totalPages": 8,
-    "hasNext": true
-  }
-}
+---
+
+# Future Agreement Integration
+
+Project creation is designed for transactional expansion.
+
+Future flow:
+
+```text id="r3k8v5"
+BEGIN TRANSACTION
+        │
+        ▼
+Create Project
+        │
+        ▼
+Create Draft Agreement
+        │
+        ▼
+Create Agreement Participants
+        │
+        ▼
+Create Project Audit
+        │
+        ▼
+COMMIT
 ```
+
+This guarantees that a Project and its Agreement are always created together as a single atomic operation.
 
 ####################################################################################################################
 
 # Phase 6 — Caching, Pagination & Performance
 
-## Overview
+# Overview
 
-The Project Module is optimized for high read performance and scalability using Redis caching, server-side pagination, filtering, sorting, and transactional database operations.
+The Project Module is optimized for scalable read performance using Redis caching, server-side pagination, database-level searching, filtering, sorting, and transactional database operations.
 
-These optimizations reduce database load, improve response times, and ensure consistent performance as the number of projects grows.
+These optimizations reduce PostgreSQL load, improve response times, and ensure consistent performance as the number of workspaces and projects grows.
 
 ---
 
 # Redis Caching
 
-The module follows the **Cache-Aside Pattern**.
+The Project Module follows the **Cache-Aside Pattern**.
 
 For every supported read endpoint:
 
-1. Check Redis.
-2. Return cached data if available.
-3. Query PostgreSQL on cache miss.
-4. Cache the database response.
-5. Return the response.
+```text id="x4z2jm"
+Request
+    │
+    ▼
+Check Redis
+    │
+    ├──────── Cache Hit ───────► Return Cached Response
+    │
+    └──────── Cache Miss
+                 │
+                 ▼
+         Query PostgreSQL
+                 │
+                 ▼
+        Store Result in Redis
+                 │
+                 ▼
+          Return Response
+```
+
+This minimizes repeated database queries for frequently accessed data.
 
 ---
 
@@ -1463,44 +2047,53 @@ For every supported read endpoint:
 
 Endpoint
 
-```text
+```text id="5nx2ci"
 GET /projects/:projectId
 ```
 
 Cache Key
 
-```text
+```text id="3nkqpl"
 project:{projectId}
 ```
 
 Purpose
 
+* Fast project retrieval.
 * Reduce repeated database lookups.
-* Improve project detail response time.
 
 ---
 
-## Workspace Project Listing
+## Workspace Project List
 
 Endpoint
 
-```text
+```text id="ldl8s3"
 GET /workspaces/:workspaceId/projects
 ```
 
 Cache Key
 
-```text
+```text id="4bljcw"
 workspace:{workspaceId}:projects:{queryHash}
 ```
 
-The query hash uniquely identifies pagination, search, filtering, and sorting combinations.
+The query hash uniquely represents:
+
+* Page
+* Limit
+* Search
+* Status
+* Sort
+* Order
 
 Example
 
-```text
-workspace:abc123:projects:{"page":1,"limit":20,"status":"ACTIVE"}
+```text id="vsd2wa"
+workspace:abc123:projects:{"page":1,"limit":20,"status":"ACTIVE","sort":"createdAt"}
 ```
+
+Each unique query has its own cache entry.
 
 ---
 
@@ -1508,13 +2101,13 @@ workspace:abc123:projects:{"page":1,"limit":20,"status":"ACTIVE"}
 
 Endpoint
 
-```text
+```text id="6kjjvw"
 GET /projects/:projectId/audits
 ```
 
 Cache Key
 
-```text
+```text id="j3mdji"
 project:{projectId}:audits:{queryHash}
 ```
 
@@ -1522,10 +2115,10 @@ project:{projectId}:audits:{queryHash}
 
 # Cache Expiration
 
-All cache entries use a Time-To-Live (TTL) of:
+All Project Module cache entries use:
 
-```text
-10 Minutes
+```text id="2sdp1h"
+TTL = 10 Minutes
 ```
 
 Expired entries are automatically removed by Redis.
@@ -1536,56 +2129,74 @@ Expired entries are automatically removed by Redis.
 
 To maintain consistency between Redis and PostgreSQL, cache entries are invalidated immediately after successful write operations.
 
+---
+
 ## Create Project
 
-Invalidated
+Invalidates
 
 * Workspace Project List Cache
+
+Reason
+
+A newly created project changes the workspace listing.
 
 ---
 
 ## Update Project
 
-Invalidated
+Invalidates
 
-* Project Cache
+* Single Project Cache
 * Workspace Project List Cache
 * Project Audit Cache
+
+Reason
+
+Project information and audit history have changed.
 
 ---
 
 ## Delete Project
 
-Invalidated
+Invalidates
 
-* Project Cache
+* Single Project Cache
 * Workspace Project List Cache
 * Project Audit Cache
+
+Reason
+
+Deleted projects should no longer appear in active queries.
 
 ---
 
 ## Update Project Status
 
-Invalidated
+Invalidates
 
-* Project Cache
+* Single Project Cache
 * Workspace Project List Cache
 * Project Audit Cache
+
+Reason
+
+Lifecycle changes affect both project data and audit history.
 
 ---
 
 # Pagination
 
-Workspace project listing and audit log retrieval support server-side pagination.
+Workspace Project Listing and Project Audit Listing both support server-side pagination.
 
-Supported parameters
+Supported Parameters
 
-| Parameter | Description                |
-| --------- | -------------------------- |
-| page      | Current page number        |
-| limit     | Number of records per page |
+| Parameter | Description         |
+| --------- | ------------------- |
+| page      | Current page number |
+| limit     | Records per page    |
 
-Pagination is implemented directly at the database layer using:
+Pagination is executed directly by PostgreSQL using:
 
 * OFFSET
 * LIMIT
@@ -1594,125 +2205,192 @@ This prevents loading unnecessary records into memory.
 
 ---
 
+# Pagination Response
+
+Every paginated endpoint returns:
+
+```json id="gljlwm"
+{
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 86,
+    "totalPages": 5,
+    "hasNext": true
+  }
+}
+```
+
+---
+
 # Search
 
-Workspace projects support text-based searching.
+Workspace projects support case-insensitive searching.
 
-Searchable fields
+Searchable Fields
 
 * Project Title
 * Project Description
 
-Search is executed directly by PostgreSQL using case-insensitive matching.
+Searching is executed directly by PostgreSQL.
 
 ---
 
 # Filtering
 
-Projects can be filtered by:
+Projects can be filtered using:
 
 * Project Status
 
-Audit logs can be filtered by:
+Audit logs can be filtered using:
 
 * Audit Action
 
-Filtering is performed at the database level.
+Filtering is performed entirely at the database level.
 
 ---
 
 # Sorting
 
-Supported project sort fields
+Supported Project Sort Fields
 
 * Created Date
 * Updated Date
 * Project Title
-* Estimated Budget
-* Expected Start Date
-* Expected Completion Date
+* Project Status
 
-Supported ordering
+Supported Ordering
 
 * Ascending
 * Descending
 
-Sorting is executed by PostgreSQL.
+Sorting is performed by PostgreSQL.
 
 ---
 
 # Soft Delete Performance
 
-Deleted projects remain in the database but are excluded from normal queries.
+Projects are never physically removed.
 
-Every repository query automatically filters:
+Instead,
 
-```sql
-deletedAt IS NULL
+```text id="mejlwm"
+deletedAt = Current Timestamp
 ```
 
-This preserves historical data while ensuring deleted records do not impact application behavior.
+Every repository query automatically excludes deleted records.
+
+```sql id="jlwmux"
+WHERE deletedAt IS NULL
+```
+
+Benefits
+
+* Historical preservation
+* Fast active queries
+* Audit integrity
+* Future recovery support
 
 ---
 
 # Database Transactions
 
-The following operations execute within a single Prisma transaction:
+Every write operation executes inside a Prisma transaction.
+
+Current transactional operations
 
 * Create Project
 * Update Project
 * Delete Project
 * Update Project Status
 
-This guarantees:
+This guarantees
 
 * Atomic writes
-* Audit consistency
+* Consistent audit logs
 * Automatic rollback on failure
-* Data integrity
+* Database integrity
 
 ---
 
-# Performance Benefits
+# Future Transaction Expansion
 
-The implemented optimizations provide:
+The Project Module is prepared for Agreement integration.
 
-* Reduced PostgreSQL load through Redis caching.
-* Lower response latency for frequently accessed resources.
-* Efficient handling of large project datasets.
-* Scalable project listing through server-side pagination.
-* Optimized database queries using filtering and sorting.
-* Consistent cache behavior through automatic invalidation.
-* Reliable write operations through transactional consistency.
+Future project creation flow:
+
+```text id="j4vhp1"
+BEGIN TRANSACTION
+        │
+        ▼
+Create Project
+        │
+        ▼
+Create Draft Agreement
+        │
+        ▼
+Create Agreement Participants
+        │
+        ▼
+Create Project Audit
+        │
+        ▼
+COMMIT
+```
+
+Any failure results in:
+
+```text id="v7jlwm"
+ROLLBACK
+```
+
+---
+
+# Performance Optimizations
+
+The Project Module includes:
+
+* Redis Cache-Aside Pattern
+* Automatic cache invalidation
+* Server-side pagination
+* Database-level searching
+* Database-level filtering
+* Database-level sorting
+* Transactional database writes
+* Immutable audit logging
+* Soft delete strategy
 
 ---
 
 # Scalability Considerations
 
-The Project Module is designed to scale with increasing workspace and project counts by:
+The module is designed to scale efficiently by:
 
-* Caching read-heavy endpoints.
-* Performing pagination at the database layer.
-* Avoiding unnecessary data retrieval.
+* Reducing database reads through Redis.
+* Caching frequently accessed resources.
+* Paginating large datasets.
+* Executing search, filtering, and sorting within PostgreSQL.
 * Invalidating only affected cache entries.
-* Separating business logic from persistence logic.
-* Maintaining immutable audit records without impacting read performance.
+* Maintaining a lightweight Project entity by delegating contractual data to the Agreement Module.
+* Preparing transactional integration with future modules without architectural changes.
+
+The Project Module remains focused on project identity and lifecycle, enabling future modules such as Agreement, Milestones, Deliverables, Invoices, and Payments to scale independently while maintaining transactional consistency.
 
 ####################################################################################################################
 
 # Phase 7 — Error Handling & Validation
 
-## Overview
+# Overview
 
-The Project Module follows a layered validation strategy to ensure every request is authenticated, authorized, validated, and executed safely before any database changes occur.
+The Project Module follows a multi-layer validation strategy to ensure every request is authenticated, authorized, validated, and executed safely before any database changes occur.
 
-Validation is performed in multiple stages to prevent invalid data from reaching the persistence layer.
+Validation is performed at multiple layers to maintain data integrity, enforce business rules, and guarantee transactional consistency.
 
 ---
 
 # Validation Flow
 
-```text
+```text id="mk4c9p"
 HTTP Request
       │
       ▼
@@ -1731,26 +2409,35 @@ Permission Validation
 Database Transaction
       │
       ▼
+Audit Logging
+      │
+      ▼
+Cache Invalidation
+      │
+      ▼
 Success Response
 ```
 
-Each stage must complete successfully before the next stage begins.
+Each validation layer must succeed before the next layer is executed.
 
 ---
 
 # Authentication Validation
 
-Every endpoint requires a valid JWT Access Token.
+All Project Module endpoints require a valid JWT Access Token.
+
+Authentication is performed before any controller logic executes.
 
 If authentication fails:
 
-* Request execution stops immediately.
+* Request processing stops immediately.
 * No business logic is executed.
-* No database operation is performed.
+* No database transaction begins.
+* No cache operations occur.
 
-Possible responses:
+Possible authentication failures include:
 
-* Unauthorized
+* Missing Access Token
 * Invalid Token
 * Expired Token
 
@@ -1758,24 +2445,33 @@ Possible responses:
 
 # DTO Validation
 
-Incoming requests are validated using Zod schemas.
+Incoming requests are validated using Zod schemas before reaching the service layer.
 
-Validated fields include:
+---
 
 ## Create Project
 
+Validated fields:
+
 * title
 * description
-* estimatedBudget
-* estimatedDuration
-* expectedStartDate
-* expectedCompletionDate
+
+Only these fields are accepted.
+
+Project lifecycle and ownership are assigned internally.
 
 ---
 
 ## Update Project
 
-All project fields are optional, but any supplied value must pass validation.
+Validated fields:
+
+* title
+* description
+
+Only project metadata may be updated.
+
+Contractual information is intentionally excluded.
 
 ---
 
@@ -1784,6 +2480,8 @@ All project fields are optional, but any supplied value must pass validation.
 Validated field:
 
 * status
+
+The supplied status must be a valid `ProjectStatus` enum value.
 
 ---
 
@@ -1813,95 +2511,103 @@ Validated query parameters:
 
 # Business Validation
 
-After DTO validation succeeds, additional business rules are enforced.
+After DTO validation succeeds, business rules are enforced.
+
+---
 
 ## Project Title
 
-Rules:
+Rules
 
 * Required during creation.
-* Trimmed before storage.
-* Must satisfy application-defined length constraints.
+* Automatically trimmed.
+* Must satisfy configured minimum length.
+* Must satisfy configured maximum length.
 
 ---
 
-## Description
+## Project Description
 
-Rules:
+Rules
 
 * Optional.
-* Trimmed before storage.
-* Must satisfy maximum length constraints.
+* Automatically trimmed.
+* Must satisfy configured maximum length.
 
 ---
 
-## Estimated Budget
+## Project Lifecycle
 
-Rules:
+Projects always begin as:
 
-* Optional.
-* Must be greater than zero.
-
----
-
-## Estimated Duration
-
-Rules:
-
-* Optional.
-* Must be a positive integer.
-
----
-
-## Expected Dates
-
-Rules:
-
-* Start date is optional.
-* Completion date is optional.
-* If both are supplied, completion date must be later than the start date.
-
----
-
-## Project Status
-
-Status transitions are validated before updates are allowed.
-
-Allowed transitions:
-
-```text
+```text id="jlwm81"
 DRAFT
- ├──► ACTIVE
- └──► CANCELLED
+```
+
+Clients cannot choose the initial lifecycle state.
+
+---
+
+## Status Transition Validation
+
+Only approved lifecycle transitions are accepted.
+
+Allowed transitions
+
+```text id="jlwm82"
+DRAFT
+ ├────────► ACTIVE
+ └────────► CANCELLED
 
 ACTIVE
- ├──► COMPLETED
- └──► MUTUALLY_TERMINATED
+ ├────────► COMPLETED
+ └────────► MUTUALLY_TERMINATED
 ```
 
 Rejected transitions include:
 
 * ACTIVE → DRAFT
-* COMPLETED → Any Status
-* CANCELLED → Any Status
-* MUTUALLY_TERMINATED → Any Status
+* COMPLETED → Any State
+* CANCELLED → Any State
+* MUTUALLY_TERMINATED → Any State
 * DRAFT → COMPLETED
 * DRAFT → MUTUALLY_TERMINATED
+
+Projects in terminal states cannot transition further.
+
+---
+
+# Agreement Responsibility Validation
+
+The Project Module intentionally rejects responsibility for contractual information.
+
+The following are not validated by the Project Module:
+
+* Budget
+* Timeline
+* Scope
+* Deliverables
+* Participants
+* Acceptance Criteria
+* Commercial Terms
+
+These validations belong exclusively to the Agreement Module.
 
 ---
 
 # Permission Validation
 
-Permission checks are performed through the `ProjectPermissionService`.
+Authorization is centralized inside the `ProjectPermissionService`.
 
-Validation includes:
+Permission validation includes:
 
 * Workspace membership.
 * Project visibility.
 * Project ownership.
-* Update permissions.
-* Delete permissions.
-* Status update permissions.
+* Update permission.
+* Delete permission.
+* Status update permission.
+* Audit log visibility.
 
 Unauthorized requests are rejected before database access.
 
@@ -1909,37 +2615,84 @@ Unauthorized requests are rejected before database access.
 
 # Database Validation
 
-Before write operations:
+Before write operations, the module verifies:
 
-* Project existence is verified.
-* Workspace existence is verified.
-* Soft deleted projects are excluded.
-* Foreign key relationships are validated.
+* Workspace exists.
+* Project exists.
+* Project has not been soft deleted.
+* User has access.
+* Foreign key integrity.
+
+Invalid resources immediately terminate the request.
 
 ---
 
 # Transaction Validation
 
-The following operations execute inside a single database transaction:
+Every write operation executes inside a Prisma transaction.
+
+Current transactional operations:
 
 * Create Project
 * Update Project
 * Delete Project
 * Update Project Status
 
-If any step fails:
+If any operation fails:
 
-* Entire transaction is rolled back.
-* No partial updates occur.
-* No inconsistent audit records are created.
+```text id="jlwm83"
+ROLLBACK ENTIRE TRANSACTION
+```
+
+This prevents:
+
+* Partial writes.
+* Missing audit records.
+* Inconsistent project state.
+* Cache inconsistency.
+
+---
+
+# Future Transaction Expansion
+
+The transaction is prepared for Agreement integration.
+
+Future flow:
+
+```text id="jlwm84"
+BEGIN TRANSACTION
+        │
+        ▼
+Create Project
+        │
+        ▼
+Create Draft Agreement
+        │
+        ▼
+Create Agreement Participants
+        │
+        ▼
+Create Audit Record
+        │
+        ▼
+COMMIT
+```
+
+If Agreement creation fails:
+
+```text id="jlwm85"
+ROLLBACK
+```
+
+The Project and Agreement will always remain consistent.
 
 ---
 
 # Standard Error Response
 
-Every failed request follows the same response structure.
+Every failed request follows a consistent response format.
 
-```json
+```json id="jlwm86"
 {
   "success": false,
   "message": "Project not found.",
@@ -1951,33 +2704,410 @@ Every failed request follows the same response structure.
 
 # Common Error Codes
 
-| HTTP Status | Error Code                        | Description                  |
-| ----------- | --------------------------------- | ---------------------------- |
-| 400         | INVALID_PROJECT_TITLE             | Invalid project title        |
-| 400         | INVALID_PROJECT_DESCRIPTION       | Invalid project description  |
-| 400         | INVALID_ESTIMATED_BUDGET          | Invalid estimated budget     |
-| 400         | INVALID_ESTIMATED_DURATION        | Invalid estimated duration   |
-| 400         | INVALID_PROJECT_DATES             | Invalid expected dates       |
-| 400         | INVALID_PROJECT_STATUS_TRANSITION | Invalid lifecycle transition |
-| 400         | PROJECT_NOT_EDITABLE              | Project cannot be edited     |
-| 401         | UNAUTHORIZED                      | Authentication required      |
-| 403         | INSUFFICIENT_PERMISSIONS          | Permission denied            |
-| 404         | WORKSPACE_NOT_FOUND               | Workspace not found          |
-| 404         | PROJECT_NOT_FOUND                 | Project not found            |
+| HTTP Status | Error Code                        | Description                      |
+| ----------- | --------------------------------- | -------------------------------- |
+| 400         | INVALID_PROJECT_TITLE             | Invalid project title            |
+| 400         | INVALID_PROJECT_DESCRIPTION       | Invalid project description      |
+| 400         | INVALID_PROJECT_STATUS_TRANSITION | Invalid lifecycle transition     |
+| 400         | PROJECT_NOT_EDITABLE              | Project cannot be modified       |
+| 401         | UNAUTHORIZED                      | Authentication required          |
+| 403         | INSUFFICIENT_PERMISSIONS          | Permission denied                |
+| 404         | WORKSPACE_NOT_FOUND               | Workspace does not exist         |
+| 404         | PROJECT_NOT_FOUND                 | Project does not exist           |
+| 409         | PROJECT_ALREADY_DELETED           | Project has already been deleted |
+| 500         | INTERNAL_SERVER_ERROR             | Unexpected server error          |
 
-> Replace the error code names above with the exact constants defined in your `ErrorCodes.ts` file if they differ.
+Replace these with the exact error code constants defined in the application's `ErrorCodes.ts` if they differ.
+
+---
+
+# Cache Consistency
+
+Validation failures never modify Redis.
+
+Redis cache invalidation occurs only after successful transactional commits.
+
+This guarantees:
+
+* No stale cache entries.
+* No cache invalidation on failed requests.
+* Cache always reflects committed database state.
+
+---
+
+# Audit Validation
+
+Audit records are created only after successful business operations.
+
+Failed validations do not create audit entries.
+
+Every audit record contains:
+
+* Project Identifier
+* Actor Identifier
+* Action
+* Metadata
+* Timestamp
+
+Audit records are immutable and cannot be modified.
 
 ---
 
 # Validation Principles
 
-The Project Module follows these principles:
+The Project Module follows these design principles:
 
-* Validate as early as possible.
-* Reject invalid input before business logic execution.
-* Centralize business validation inside validators.
-* Centralize authorization inside the permission service.
-* Keep controllers free of validation logic.
-* Keep repositories free of business rules.
-* Ensure transactional consistency for every write operation.
-* Return consistent error responses across all endpoints.
+* Authenticate before processing.
+* Validate request data before business logic.
+* Centralize business validation in validators.
+* Centralize authorization in the permission service.
+* Keep controllers free of business rules.
+* Keep repositories free of validation logic.
+* Execute all write operations transactionally.
+* Maintain cache consistency through post-commit invalidation.
+* Keep Project responsibilities independent of contractual concerns.
+* Delegate all commercial validation to the Agreement Module.
+
+This layered validation strategy ensures the Project Module remains secure, consistent, maintainable, and ready for seamless integration with the Agreement Module.
+
+####################################################################################################################
+
+# Phase 8 — Project Transfer
+
+# Overview
+
+The Project Transfer feature allows a project to be moved from a **Personal Workspace** to a **Team Workspace**.
+
+This feature supports the common workflow where an individual initially manages a project privately and later transitions it into a collaborative team environment.
+
+Project transfer is intentionally restricted to preserve ownership, audit integrity, and workspace isolation.
+
+---
+
+# Business Motivation
+
+Typical workflow:
+
+```text id="jlwm901"
+Personal Workspace
+        │
+        ▼
+Create Project
+        │
+        ▼
+Discuss Requirements
+        │
+        ▼
+Need Team Collaboration
+        │
+        ▼
+Transfer Project
+        │
+        ▼
+Team Workspace
+```
+
+This enables a seamless transition from individual planning to collaborative execution.
+
+---
+
+# Supported Transfer
+
+Only the following transfer is permitted:
+
+```text id="jlwm902"
+Personal Workspace
+        │
+        ▼
+Team Workspace
+```
+
+---
+
+# Unsupported Transfers
+
+The following transfers are rejected.
+
+## Team → Team
+
+```text id="jlwm903"
+Team Workspace A
+        │
+        ▼
+Team Workspace B
+```
+
+Reason
+
+Projects belong to the organizational context in which they were created.
+
+---
+
+## Team → Personal
+
+```text id="jlwm904"
+Team Workspace
+        │
+        ▼
+Personal Workspace
+```
+
+Reason
+
+Once collaboration begins, ownership and permissions should remain within the team.
+
+---
+
+## Personal → Personal
+
+```text id="jlwm905"
+Personal Workspace A
+        │
+        ▼
+Personal Workspace B
+```
+
+Reason
+
+A user owns only one personal workspace.
+
+---
+
+# Business Rules
+
+A project can be transferred only when **all** of the following conditions are satisfied:
+
+* Source workspace is `PERSONAL`.
+* Destination workspace is `TEAM`.
+* Project status is `DRAFT`.
+* User is the Project creator.
+* User is a member of the destination workspace.
+* Project has not been soft deleted.
+
+If any condition fails, the transfer is rejected.
+
+---
+
+# Project Status Restriction
+
+Only projects in the following state may be transferred:
+
+```text id="jlwm906"
+DRAFT
+```
+
+Projects in these states cannot be transferred:
+
+```text id="jlwm907"
+ACTIVE
+
+COMPLETED
+
+MUTUALLY_TERMINATED
+
+CANCELLED
+```
+
+This guarantees that active execution never changes organizational context.
+
+---
+
+# Data Changes
+
+Only a single field is modified during transfer.
+
+```text id="jlwm908"
+workspaceId
+```
+
+The following remain unchanged:
+
+* Project ID
+* Project Title
+* Description
+* Created By
+* Status
+* Created Date
+* Updated Date
+
+The project retains its complete identity.
+
+---
+
+# Audit Logging
+
+Every transfer creates an immutable audit record.
+
+Audit Action
+
+```text id="jlwm909"
+UPDATED
+```
+
+Metadata
+
+```json id="jlwm910"
+{
+  "type": "PROJECT_TRANSFER",
+  "fromWorkspaceId": "...",
+  "toWorkspaceId": "..."
+}
+```
+
+This preserves transfer history without introducing a new database enum.
+
+---
+
+# Transaction Flow
+
+Project transfer executes inside a single database transaction.
+
+```text id="’wini911"
+BEGIN TRANSACTION
+        │
+        ▼
+Validate Project
+        │
+        ▼
+Validate Source Workspace
+        │
+        ▼
+Validate Destination Workspace
+        │
+        ▼
+Validate Destination Membership
+        │
+        ▼
+Validate Project Status
+        │
+        ▼
+Update Project.workspaceId
+        │
+        ▼
+Create Audit Record
+        │
+        ▼
+COMMIT
+```
+
+If any validation or database operation fails:
+
+```text id="’wini912"
+ROLLBACK
+```
+
+No partial updates are persisted.
+
+---
+
+# Authorization
+
+Only the Project creator may transfer a project.
+
+Additional requirements:
+
+* Creator must belong to the destination Team Workspace.
+* Destination workspace must be accessible.
+* Project must satisfy all transfer rules.
+
+---
+
+# REST API
+
+## Endpoint
+
+```text id="’wini913"
+PATCH /projects/:projectId/transfer
+```
+
+---
+
+## Authentication
+
+JWT Access Token required.
+
+---
+
+## Request Body
+
+```json id="’wini914"
+{
+  "destinationWorkspaceId": "workspace-uuid"
+}
+```
+
+---
+
+## Success Response
+
+```json id="’wini915"
+{
+  "success": true,
+  "message": "Project transferred successfully.",
+  "data": {
+    "id": "...",
+    "workspaceId": "...",
+    "createdById": "...",
+    "title": "...",
+    "description": "...",
+    "status": "DRAFT"
+  }
+}
+```
+
+---
+
+# Redis Cache Invalidation
+
+A successful transfer invalidates:
+
+* Source Workspace Project List Cache
+* Destination Workspace Project List Cache
+* Single Project Cache
+* Project Audit Cache
+
+This ensures that subsequent reads reflect the new workspace immediately.
+
+---
+
+# Error Scenarios
+
+| Scenario                                      | Result            |
+| --------------------------------------------- | ----------------- |
+| Source workspace is not Personal              | Transfer rejected |
+| Destination workspace is not Team             | Transfer rejected |
+| User is not a member of destination workspace | Transfer rejected |
+| Project is not in DRAFT state                 | Transfer rejected |
+| Project not found                             | Transfer rejected |
+| Workspace not found                           | Transfer rejected |
+
+---
+
+# Future Compatibility
+
+The transfer feature is fully compatible with the finalized architecture.
+
+It preserves:
+
+* Project identity
+* Agreement relationship
+* Audit history
+* Redis caching
+* Authorization model
+* Transactional consistency
+
+Since the Project and Agreement maintain a mandatory one-to-one relationship, the associated Agreement continues to belong to the Project after transfer without requiring changes to the relationship itself.
+
+---
+
+# Design Principles
+
+The Project Transfer feature follows these principles:
+
+* Only Personal → Team transfers are allowed.
+* Projects remain immutable after execution begins.
+* Workspace changes are fully transactional.
+* Audit history is preserved.
+* Cache consistency is maintained.
+* No Prisma schema changes are required.
+* Existing architecture, repositories, services, controllers, and authorization remain unchanged.

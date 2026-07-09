@@ -301,4 +301,63 @@ export class ProjectService {
 
     return updatedProject;
   }
+
+  // ==================================================
+// Transfer Project
+// ==================================================
+
+// ==================================================
+// Transfer Project
+// ==================================================
+
+static async transfer(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  destinationWorkspaceId: string,
+  userId: string
+): Promise<{
+  project: Project;
+  previousWorkspaceId: string;
+}> {
+  const { project } =
+    await ProjectPermissionService.ensureProjectTransferable(
+      projectId,
+      destinationWorkspaceId,
+      userId
+    );
+
+  const previousWorkspaceId =
+    project.workspaceId;
+
+  const updatedProject =
+    await ProjectRepository.transferWorkspace(
+      tx,
+      projectId,
+      destinationWorkspaceId
+    );
+
+  await ProjectAuditRepository.create(tx, {
+    projectId,
+
+    actorId: userId,
+
+    action:
+      ProjectAuditAction.UPDATED,
+
+    metadata: {
+      type: "PROJECT_TRANSFER",
+
+      fromWorkspaceId:
+        previousWorkspaceId,
+
+      toWorkspaceId:
+        destinationWorkspaceId,
+    },
+  });
+
+  return {
+    project: updatedProject,
+    previousWorkspaceId,
+  };
+}
 }

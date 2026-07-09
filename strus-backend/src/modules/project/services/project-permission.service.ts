@@ -5,7 +5,8 @@ import {
 
 import { AppError } from "../../../core/errors/AppError.js";
 import { ErrorCode } from "../../../core/errors/ErrorCodes.js";
-
+import { WorkspaceType } from "../../../generated/prisma/enums.js";
+import { WorkspaceRepository } from "../../workspace/repositories/workspace.repository.js";
 import { ProjectRepository } from "../repositories/project.repository.js";
 
 export class ProjectPermissionService {
@@ -151,4 +152,83 @@ export class ProjectPermissionService {
 
     return project;
   }
+
+  static async ensureProjectTransferable(
+  projectId: string,
+  destinationWorkspaceId: string,
+  userId: string
+) {
+  const project =
+    await this.ensureProjectDeletable(
+      projectId,
+      userId
+    );
+
+  if (
+    project.status !==
+    ProjectStatus.DRAFT
+  ) {
+    throw new Error(
+      "Only draft projects can be transferred."
+    );
+  }
+
+  const sourceWorkspace =
+    await WorkspaceRepository.findWorkspaceById(
+      project.workspaceId
+    );
+
+  if (!sourceWorkspace) {
+    throw new Error(
+      "Source workspace not found."
+    );
+  }
+
+  if (
+    sourceWorkspace.workspaceType !==
+    WorkspaceType.PERSONAL
+  ) {
+    throw new Error(
+      "Only projects from personal workspaces can be transferred."
+    );
+  }
+
+  const destinationWorkspace =
+    await WorkspaceRepository.findWorkspaceById(
+      destinationWorkspaceId
+    );
+
+  if (!destinationWorkspace) {
+    throw new Error(
+      "Destination workspace not found."
+    );
+  }
+
+  if (
+    destinationWorkspace.workspaceType !==
+    WorkspaceType.TEAM
+  ) {
+    throw new Error(
+      "Projects can only be transferred to team workspaces."
+    );
+  }
+
+  const membership =
+    await WorkspaceRepository.findMember(
+      destinationWorkspaceId,
+      userId
+    );
+
+  if (!membership) {
+    throw new Error(
+      "You must be a member of the destination workspace."
+    );
+  }
+
+  return {
+    project,
+    sourceWorkspace,
+    destinationWorkspace,
+  };
+}
 }

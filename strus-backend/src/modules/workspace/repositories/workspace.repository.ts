@@ -654,4 +654,14 @@ static async findWorkspaceIds(
     },
   });
 }
+
+static async findWorkspaceById(
+  workspaceId: string
+) {
+  return prisma.workspace.findUnique({
+    where: {
+      id: workspaceId,
+    },
+  });
+}
 }

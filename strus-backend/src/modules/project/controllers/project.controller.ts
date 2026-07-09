@@ -10,6 +10,9 @@ import type { CreateProjectDto } from "../dtos/create-project.dto.js";
 import { ProjectService } from "../services/project.service.js";
 import { ProjectMapper } from "../mappers/project.mapper.js";
 import { ProjectCache } from "../cache/project.cache.js";
+import type { TransferProjectDto } from "../dtos/transfer-project.dto.js";
+import { transferProjectSchema } from "../dtos/transfer-project.dto.js";
+
 
 export class ProjectController {
   // ==================================================
@@ -352,6 +355,82 @@ static async updateStatus(
 
       message:
         "Project status updated successfully.",
+
+      data:
+        ProjectMapper.toResponse(
+          project
+        ),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==================================================
+// Transfer Project
+// ==================================================
+
+// ==================================================
+// Transfer Project
+// ==================================================
+
+static async transfer(
+  req: AuthenticatedRequest<
+    { projectId: string },
+    unknown,
+    TransferProjectDto
+  >,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user.id;
+
+    const { projectId } =
+      req.params;
+
+    const dto =
+      transferProjectSchema.parse(
+        req.body
+      );
+
+    const {
+      project,
+      previousWorkspaceId,
+    } =
+      await prisma.$transaction(
+        (tx) =>
+          ProjectService.transfer(
+            tx,
+            projectId,
+            dto.destinationWorkspaceId,
+            userId
+          )
+      );
+
+    await Promise.all([
+      ProjectCache.invalidate(
+        projectId
+      ),
+
+      ProjectCache.invalidateWorkspace(
+        previousWorkspaceId
+      ),
+
+      ProjectCache.invalidateWorkspace(
+        dto.destinationWorkspaceId
+      ),
+
+      ProjectAuditCache.invalidate(
+        projectId
+      ),
+    ]);
+
+    res.status(200).json({
+      success: true,
+
+      message:
+        "Project transferred successfully.",
 
       data:
         ProjectMapper.toResponse(

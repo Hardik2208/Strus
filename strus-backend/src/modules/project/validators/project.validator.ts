@@ -26,4 +26,14 @@ export class ProjectValidator {
       );
     }
   }
+
+  static validateDestinationWorkspaceId(
+  workspaceId: string
+) {
+  if (!workspaceId.trim()) {
+    throw new Error(
+      "Destination workspace is required."
+    );
+  }
+}
 }

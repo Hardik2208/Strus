@@ -56,4 +56,10 @@ router.get(
   ProjectAuditController.getByProject
 );
 
+router.patch(
+  "/projects/:projectId/transfer",
+  authenticate,
+  ProjectController.transfer
+);
+
 export default router;
