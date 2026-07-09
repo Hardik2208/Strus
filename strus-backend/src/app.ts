@@ -18,6 +18,7 @@ import {
 import { authRoutes } from "./modules/auth/index.js";
 import { userRoutes } from "./modules/users/index.js";
 import { workspaceRoutes } from "./modules/workspace/index.js";
+import { projectRoutes } from "./modules/project/index.js";
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use("/api/v1", healthRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/workspaces", workspaceRoutes);
+app.use("/api/v1/project", projectRoutes);
 
 app.use(notFoundMiddleware);
 
