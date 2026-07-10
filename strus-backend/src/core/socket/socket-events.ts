@@ -22,4 +22,30 @@ export const SocketEvents = {
 
   OWNERSHIP_TRANSFERRED:
     "workspace.owner.transferred",
+
+  // ==================================================
+// Agreement
+// ==================================================
+
+AGREEMENT_INVITATION_ACCEPTED:
+  "agreement:invitation:accepted",
+
+AGREEMENT_INVITATION_DECLINED:
+  "agreement:invitation:declined",
+
+AGREEMENT_INVITATION_WITHDRAWN:
+  "agreement:invitation:withdrawn",
+
+AGREEMENT_PARTICIPANT_REMOVED:
+  "agreement:participant:removed",
+
+AGREEMENT_UPDATED:
+  "agreement:updated",
+
+AGREEMENT_CREATED:
+  "agreement:created",
+
+AGREEMENT_INVITATION_CREATED:
+  "agreement:invitation:created",
+
 } as const;

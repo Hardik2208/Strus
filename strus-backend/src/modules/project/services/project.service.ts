@@ -1,27 +1,17 @@
-import type {
-  Prisma,
-  Project,
-} from "../../../generated/prisma/client.js";
-
-import {
-  ProjectAuditAction,
-  ProjectStatus,
-} from "../../../generated/prisma/enums.js";
-
+import type { Prisma,Project } from "../../../generated/prisma/client.js";
+import { ProjectAuditAction,ProjectStatus } from "../../../generated/prisma/enums.js";
 import { AppError } from "../../../core/errors/AppError.js";
 import { ErrorCode } from "../../../core/errors/ErrorCodes.js";
-
+import { ProjectSetupStage } from "../../../generated/prisma/enums.js";
 import { ProjectRepository } from "../repositories/project.repository.js";
 import { ProjectAuditRepository } from "../repositories/project-audit.repository.js";
-
 import type { ListProjectsDto } from "../dtos/list-projects.dto.js";
 import type { CreateProjectDto } from "../dtos/create-project.dto.js";
 import type { UpdateProjectDto } from "../dtos/update-project.dto.js";
-
 import { ProjectValidator } from "../validators/project.validator.js";
 import { ProjectPermissionService } from "./project-permission.service.js";
-
 import { ProjectAuditCache } from "../cache/project-audit.cache.js";
+import { AgreementService } from "../../agreement/services/agreement.service.js";
 
 export class ProjectService {
   // ==================================================
@@ -185,6 +175,73 @@ export class ProjectService {
   }
 
   // ==================================================
+// Update Setup Stage (Internal)
+// ==================================================
+
+static async updateSetupStage(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  userId: string,
+  setupStage: ProjectSetupStage
+): Promise<Project> {
+  const project =
+    await ProjectPermissionService.ensureProjectAccess(
+      projectId,
+      userId
+    );
+
+  const stages = [
+    ProjectSetupStage.PROJECT_CREATED,
+    ProjectSetupStage.AGREEMENT_COMPLETED,
+    ProjectSetupStage.PROFESSIONALS_ASSIGNED,
+    ProjectSetupStage.READY_TO_START,
+  ];
+
+  const currentIndex =
+    stages.indexOf(
+      project.setupStage
+    );
+
+  const nextIndex =
+    stages.indexOf(setupStage);
+
+  if (nextIndex <= currentIndex) {
+    throw new Error(
+      "Project setup stage cannot move backwards."
+    );
+  }
+
+  const updatedProject =
+    await ProjectRepository.updateSetupStage(
+      tx,
+      projectId,
+      setupStage
+    );
+
+  await ProjectAuditRepository.create(tx, {
+    projectId,
+
+    actorId: userId,
+
+    action:
+      ProjectAuditAction.UPDATED,
+
+    metadata: {
+      type:
+        "PROJECT_SETUP_STAGE_CHANGED",
+
+      from:
+        project.setupStage,
+
+      to:
+        setupStage,
+    },
+  });
+
+  return updatedProject;
+}
+
+  // ==================================================
   // Delete Project
   // ==================================================
 
@@ -224,83 +281,110 @@ export class ProjectService {
   // ==================================================
 
   static async updateStatus(
-    tx: Prisma.TransactionClient,
-    projectId: string,
-    userId: string,
-    status: ProjectStatus
-  ): Promise<Project> {
-    const project =
-      await ProjectPermissionService.ensureProjectStatusChange(
-        projectId,
-        userId
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  userId: string,
+  status: ProjectStatus
+): Promise<Project> {
+  const project =
+    await ProjectPermissionService.ensureProjectStatusChange(
+      projectId,
+      userId
+    );
+
+  switch (project.status) {
+    case ProjectStatus.DRAFT:
+      if (status === ProjectStatus.ACTIVE) {
+        if (
+          project.setupStage !==
+          ProjectSetupStage.READY_TO_START
+        ) {
+          throw new AppError(
+            "Project setup is not complete.",
+            400,
+            ErrorCode.INVALID_PROJECT_STATUS_TRANSITION
+          );
+        }
+
+        await AgreementService.ensureProjectCanBeActivated(
+          projectId
+        );
+
+        break;
+      }
+
+      if (
+        status === ProjectStatus.CANCELLED
+      ) {
+        break;
+      }
+
+      throw new AppError(
+        "Project status cannot be changed.",
+        400,
+        ErrorCode.INVALID_PROJECT_STATUS_TRANSITION
       );
 
-    switch (project.status) {
-      case ProjectStatus.DRAFT:
-        if (
-          status !==
-            ProjectStatus.ACTIVE &&
-          status !==
-            ProjectStatus.CANCELLED
-        ) {
-          throw new AppError(
-            "Invalid project status transition.",
-            400,
-            ErrorCode.INVALID_PROJECT_STATUS_TRANSITION
-          );
-        }
-        break;
-
-      case ProjectStatus.ACTIVE:
-        if (
-          status !==
-            ProjectStatus.COMPLETED &&
-          status !==
-            ProjectStatus.MUTUALLY_TERMINATED
-        ) {
-          throw new AppError(
-            "Invalid project status transition.",
-            400,
-            ErrorCode.INVALID_PROJECT_STATUS_TRANSITION
-          );
-        }
-        break;
-
-      default:
+    case ProjectStatus.ACTIVE:
+      if (
+        status !==
+          ProjectStatus.COMPLETED &&
+        status !==
+          ProjectStatus.MUTUALLY_TERMINATED
+      ) {
         throw new AppError(
           "Project status cannot be changed.",
           400,
           ErrorCode.INVALID_PROJECT_STATUS_TRANSITION
         );
-    }
+      }
 
-    const updatedProject =
-      await ProjectRepository.updateStatus(
-        tx,
-        projectId,
-        status
+      break;
+
+    case ProjectStatus.COMPLETED:
+    case ProjectStatus.MUTUALLY_TERMINATED:
+    case ProjectStatus.CANCELLED:
+      throw new AppError(
+        "Project status cannot be changed.",
+        400,
+        ErrorCode.INVALID_PROJECT_STATUS_TRANSITION
       );
 
-    await ProjectAuditRepository.create(tx, {
+    default:
+      throw new AppError(
+        "Project status cannot be changed.",
+        400,
+        ErrorCode.INVALID_PROJECT_STATUS_TRANSITION
+      );
+  }
+
+  const updatedProject =
+    await ProjectRepository.updateStatus(
+      tx,
       projectId,
-
-      actorId: userId,
-
-      action:
-        ProjectAuditAction.STATUS_CHANGED,
-
-      metadata: {
-        from: project.status,
-        to: status,
-      },
-    });
-
-    await ProjectAuditCache.invalidate(
-      projectId
+      status
     );
 
-    return updatedProject;
-  }
+  await ProjectAuditRepository.create(tx, {
+    projectId,
+
+    actorId: userId,
+
+    action:
+      ProjectAuditAction.STATUS_CHANGED,
+
+    metadata: {
+      from: project.status,
+      to: status,
+    },
+  });
+
+  await ProjectAuditCache.invalidate(
+    projectId
+  );
+
+  return updatedProject;
+}
 
   // ==================================================
 // Transfer Project

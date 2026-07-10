@@ -82,9 +82,36 @@ Supported project states:
 
 Every project is created in the **DRAFT** state.
 
-Project activation is controlled by the Agreement Module after the agreement has been successfully signed.
+Project activation requires two conditions:
+
+• Project Status = DRAFT
+• Project Setup Stage = READY_TO_START
+
+The Agreement Module, Professional Module, and future onboarding modules progressively advance the Project Setup Stage.
+
+Once the Project Setup Stage reaches READY_TO_START, the project may transition to ACTIVE.
 
 Manual activation is not supported.
+
+
+
+## Project Setup Stage
+
+The Project Module maintains an internal setup stage that tracks onboarding progress independently of the project lifecycle.
+
+Supported setup stages:
+
+• PROJECT_CREATED
+• AGREEMENT_COMPLETED
+• PROFESSIONALS_ASSIGNED
+• READY_TO_START
+
+The setup stage:
+
+• Starts at PROJECT_CREATED.
+• Can only move forward.
+• Cannot be modified through public APIs.
+• Is updated internally by other modules.
 
 ---
 
@@ -460,6 +487,7 @@ Responsible for all business logic.
 Responsibilities include:
 
 * Project lifecycle management.
+* Project setup stage management.
 * Authorization orchestration.
 * Business validation.
 * Transaction orchestration.
@@ -497,6 +525,7 @@ Validation includes:
 * Project title.
 * Project description.
 * Project status transitions.
+* Project setup stage progression
 
 Contractual validation is intentionally excluded and belongs to the Agreement Module.
 
@@ -615,6 +644,7 @@ The following operations execute inside a single transaction:
 * Update Project
 * Delete Project
 * Update Project Status
+* Update Project Setup Stage (Internal)
 
 Future versions will extend the Create Project transaction to include Agreement creation without changing the Project architecture.
 
@@ -810,6 +840,7 @@ Each audit entry records the user responsible for performing the action.
 | title       | String    | Project title                |
 | description | String?   | Optional project description |
 | status      | Enum      | Project lifecycle            |
+| setupStage  | Enum      | Internal onboarding progress |
 | createdAt   | DateTime  | Creation timestamp           |
 | updatedAt   | DateTime  | Last modification timestamp  |
 | deletedAt   | DateTime? | Soft delete timestamp        |
@@ -849,12 +880,45 @@ MUTUALLY_TERMINATED
 CANCELLED
 ```
 
+Project Setup Stage
+
+PROJECT_CREATED
+        │
+        ▼
+AGREEMENT_COMPLETED
+        │
+        ▼
+PROFESSIONALS_ASSIGNED
+        │
+        ▼
+READY_TO_START
+
 Business Rules
 
-* Every Project starts as `DRAFT`.
-* Projects cannot be manually activated.
-* Agreement signing is responsible for transitioning the Project to `ACTIVE`.
-* Completed, Cancelled, and Mutually Terminated projects are terminal states.
+• Every Project starts with:
+
+status = DRAFT
+
+setupStage = PROJECT_CREATED
+
+• setupStage may only move forward.
+
+• setupStage never moves backward.
+
+• setupStage is updated internally.
+
+• ACTIVE is allowed only when:
+
+setupStage == READY_TO_START
+
+
+Project Activation
+
+A project cannot transition from DRAFT to ACTIVE unless:
+
+setupStage == READY_TO_START
+
+If this condition is not satisfied, activation is rejected.
 
 ---
 
@@ -883,8 +947,17 @@ UPDATED
 STATUS_CHANGED
 
 DELETED
-```
 
+```
+Project setup stage changes are recorded using the UPDATED audit action.
+
+Metadata example:
+
+{
+  "type":"PROJECT_SETUP_STAGE_CHANGED",
+  "from":"PROJECT_CREATED",
+  "to":"AGREEMENT_COMPLETED"
+}
 ---
 
 # Foreign Key Constraints
@@ -926,6 +999,8 @@ DELETED
 * Index (deletedAt)
 * Composite Index (workspaceId, deletedAt)
 * Composite Index (workspaceId, status)
+* Index (setupStage)
+* Composite Index (workspaceId, setupStage)
 
 ---
 
@@ -1085,7 +1160,9 @@ CANCELLED
 Every newly created project starts as:
 
 ```text
-DRAFT
+status = DRAFT
+
+setupStage = PROJECT_CREATED
 ```
 
 No other initial status is allowed.
@@ -1116,7 +1193,7 @@ Manual activation is not permitted.
 Future flow
 
 ```text
-Agreement Signed
+READY_TO_START
         │
         ▼
 Project Status
@@ -1126,6 +1203,16 @@ ACTIVE
 ```
 
 The Project Module is prepared for this integration.
+
+Agreement activation requirements:
+
+Before a project can transition to ACTIVE:
+
+* Project setupStage must be READY_TO_START.
+* Every Agreement invitation must have reached a terminal state.
+* No Agreement invitation may remain PENDING.
+
+If any invitation is still pending, project activation is rejected until every participant has responded.
 
 ---
 
@@ -1163,6 +1250,22 @@ DRAFT
 ACTIVE
  ├────────► COMPLETED
  └────────► MUTUALLY_TERMINATED
+
+Transition from DRAFT → ACTIVE is allowed only when:
+
+setupStage == READY_TO_START
+
+AND
+
+All Agreement invitations have reached a terminal state.
+
+Accepted terminal states include:
+
+* ACCEPTED
+* DECLINED
+* REVOKED
+
+Activation is rejected while any invitation remains in the PENDING state.
 ```
 
 ---
@@ -1404,6 +1507,7 @@ Recorded events:
 * Project Updated
 * Project Status Changed
 * Project Deleted
+* Project Setup Stage Changed
 
 Each audit record stores:
 
@@ -1565,6 +1669,7 @@ Authenticated Workspace Member
     "createdById": "uuid",
     "title": "Portfolio Website",
     "description": "Personal client project",
+    "setupStage":"PROJECT_CREATED",
     "status": "DRAFT",
     "createdAt": "...",
     "updatedAt": "..."
@@ -1696,6 +1801,7 @@ Authenticated user with access to the project.
     "createdById": "...",
     "title": "...",
     "description": "...",
+    "setupStage":"PROJECT_CREATED",
     "status": "ACTIVE"
   }
 }
@@ -1734,7 +1840,8 @@ Project Creator
 ```json id="w13jb2"
 {
   "title": "Updated Project Title",
-  "description": "Updated description"
+  "description": "Updated description",
+  "setupStage":"PROJECT_CREATED",
 }
 ```
 
@@ -1803,6 +1910,10 @@ Updates the lifecycle status of a project.
 
 This endpoint exists for lifecycle management, but **ACTIVE** is intended to be set automatically after Agreement signing.
 
+ACTIVE may only be requested after the Project Setup Stage reaches READY_TO_START.
+Additionally, all Agreement invitations must have reached a terminal state.
+
+Project activation is rejected while any invitation remains PENDING.
 ---
 
 ## Authorization
@@ -2303,6 +2414,7 @@ Current transactional operations
 * Update Project
 * Delete Project
 * Update Project Status
+* Project Setup Stage Updates
 
 This guarantees
 
@@ -2513,6 +2625,15 @@ Validated query parameters:
 
 After DTO validation succeeds, business rules are enforced.
 
+Project Setup Stage
+
+Rules
+
+• Starts at PROJECT_CREATED.
+• Forward-only progression.
+• Cannot be modified through REST.
+• Updated internally by ProjectService.updateSetupStage().
+
 ---
 
 ## Project Title
@@ -2575,6 +2696,19 @@ Rejected transitions include:
 
 Projects in terminal states cannot transition further.
 
+
+ACTIVE additionally requires:
+
+setupStage == READY_TO_START
+
+Before activating a project, the Project Module delegates Agreement-specific activation validation to the Agreement Module.
+
+The Agreement Module validates:
+
+* Agreement exists.
+* No Agreement invitation remains in the PENDING state.
+
+If any invitation is still pending, activation is rejected with a business validation error.
 ---
 
 # Agreement Responsibility Validation
@@ -2590,6 +2724,7 @@ The following are not validated by the Project Module:
 * Participants
 * Acceptance Criteria
 * Commercial Terms
+* Agreement invitation completion before project activation.
 
 These validations belong exclusively to the Agreement Module.
 
@@ -2715,6 +2850,7 @@ Every failed request follows a consistent response format.
 | 404         | WORKSPACE_NOT_FOUND               | Workspace does not exist         |
 | 404         | PROJECT_NOT_FOUND                 | Project does not exist           |
 | 409         | PROJECT_ALREADY_DELETED           | Project has already been deleted |
+| 409         | INVALID_PROJECT_SETUP_STAGE       | Project setup stage invalid.     |
 | 500         | INTERNAL_SERVER_ERROR             | Unexpected server error          |
 
 Replace these with the exact error code constants defined in the application's `ErrorCodes.ts` if they differ.
@@ -2927,6 +3063,7 @@ The following remain unchanged:
 * Description
 * Created By
 * Status
+* Setup Stage
 * Created Date
 * Updated Date
 
@@ -3111,3 +3248,114 @@ The Project Transfer feature follows these principles:
 * Cache consistency is maintained.
 * No Prisma schema changes are required.
 * Existing architecture, repositories, services, controllers, and authorization remain unchanged.
+
+
+####################################################################################################################
+
+Phase X — Project Setup Stage
+Overview
+
+The Project Setup Stage tracks onboarding progress before project execution begins.
+
+Unlike the Project Status, the setup stage represents configuration progress rather than execution lifecycle.
+
+The Project Setup Stage is maintained internally by different modules and cannot be modified through public APIs.
+
+Purpose
+
+The setup stage ensures that a project satisfies all mandatory onboarding requirements before work begins.
+
+Each module is responsible for advancing the setup stage after completing its own responsibilities.
+
+Workflow
+Project Created
+        │
+        ▼
+PROJECT_CREATED
+        │
+        ▼
+Agreement Completed
+        │
+        ▼
+AGREEMENT_COMPLETED
+        │
+        ▼
+Professionals Assigned
+        │
+        ▼
+PROFESSIONALS_ASSIGNED
+        │
+        ▼
+Ready To Start
+        │
+        ▼
+READY_TO_START
+        │
+        ▼
+Project Activation
+        │
+        ▼
+ACTIVE
+Ownership
+Module	Stage
+Project Module	PROJECT_CREATED
+Agreement Module	AGREEMENT_COMPLETED
+Professionals Module	PROFESSIONALS_ASSIGNED
+Future Milestone / Setup Module	READY_TO_START
+Stage Progression
+
+The setup stage may only progress forward.
+
+Valid transitions:
+
+PROJECT_CREATED
+        │
+        ▼
+AGREEMENT_COMPLETED
+        │
+        ▼
+PROFESSIONALS_ASSIGNED
+        │
+        ▼
+READY_TO_START
+
+Backward transitions are rejected.
+
+Internal Service
+
+The Project module exposes an internal service:
+
+ProjectService.updateSetupStage(...)
+
+This service:
+
+validates forward-only progression
+updates the setup stage
+creates a Project UPDATED audit entry with metadata describing the setup stage transition
+invalidates project audit cache
+executes within the caller's transaction
+
+No controller or REST endpoint is provided.
+
+Activation Rule
+
+Before a project can transition to ACTIVE, all of the following conditions must be satisfied:
+
+status == DRAFT
+
+setupStage == READY_TO_START
+
+Every Agreement invitation has reached a terminal state.
+
+No Agreement invitation may remain PENDING.
+
+If the setup stage has not reached READY_TO_START, activation is rejected.
+
+Design Principles
+Setup stage and project status are independent.
+Setup stage is an internal workflow state.
+Public clients cannot modify setup stages.
+Each module owns advancement of its corresponding stage.
+Forward-only progression guarantees workflow integrity.
+Audit history is preserved for every stage transition.
+Existing architecture, caching, authorization, and transactional behavior remain unchanged.

@@ -1,5 +1,6 @@
-import type {
+import {
   ProjectStatus,
+  ProjectSetupStage,
 } from "../../../generated/prisma/enums.js";
 
 export interface ProjectResponse {
@@ -14,6 +15,8 @@ export interface ProjectResponse {
   description: string | null;
 
   status: ProjectStatus;
+
+  setupStage: ProjectSetupStage;
 
   createdAt: Date;
 

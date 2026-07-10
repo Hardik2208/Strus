@@ -12,7 +12,8 @@ import { ProjectMapper } from "../mappers/project.mapper.js";
 import { ProjectCache } from "../cache/project.cache.js";
 import type { TransferProjectDto } from "../dtos/transfer-project.dto.js";
 import { transferProjectSchema } from "../dtos/transfer-project.dto.js";
-
+import { getIO } from "../../../core/socket/socket.js";
+import { SocketEvents } from "../../../core/socket/socket-events.js";
 
 export class ProjectController {
   // ==================================================
@@ -50,6 +51,17 @@ export class ProjectController {
       await ProjectCache.invalidateWorkspace(
   workspaceId
 );
+
+const sockets =
+  await getIO()
+    .in(`user:${req.user.id}`)
+    .fetchSockets();
+
+for (const socket of sockets) {
+  socket.join(
+    `project:${project.id}`
+  );
+}
 
       res.status(201).json({
         success: true,

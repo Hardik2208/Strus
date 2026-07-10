@@ -104,6 +104,37 @@ enum ProjectAuditAction {
   DELETED
 }
 
+enum ProjectSetupStage {
+  PROJECT_CREATED
+  AGREEMENT_COMPLETED
+  PROFESSIONALS_ASSIGNED
+  READY_TO_START
+}
+
+enum AgreementParticipantRole {
+  CLIENT
+  PROFESSIONAL
+}
+
+enum AgreementInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+}
+
+enum AgreementAuditAction {
+  CREATED
+  UPDATED
+
+  PROFESSIONAL_INVITED
+  INVITATION_ACCEPTED
+  INVITATION_DECLINED
+  INVITATION_WITHDRAWN
+
+  PROFESSIONAL_REMOVED
+}
+
 //
 // ======================================================
 // AUTHENTICATION
@@ -146,6 +177,18 @@ model User {
   receivedWorkspaceInvitations WorkspaceInvitation[] @relation("WorkspaceInvitationRecipient")
 
   auditLogs WorkspaceAuditLog[]
+
+  //
+  // Project Relations
+  //
+
+  agreementsCreated Agreement[] @relation("AgreementCreatedBy")
+
+  agreementsUpdated Agreement[] @relation("AgreementUpdatedBy")
+
+  agreementParticipants AgreementParticipant[]
+
+  agreementAudits AgreementAudit[]
 
   //
   // Other Relations
@@ -465,6 +508,8 @@ model Project {
 
   status ProjectStatus @default(DRAFT)
 
+  setupStage ProjectSetupStage @default(PROJECT_CREATED) @map("setup_stage")
+
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
@@ -472,7 +517,8 @@ model Project {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   createdBy User      @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
-  audits ProjectAudit[]
+  audits    ProjectAudit[]
+  agreement Agreement?
 
   @@index([workspaceId])
   @@index([createdById])
@@ -506,4 +552,68 @@ model ProjectAudit {
   @@index([action])
   @@index([createdAt])
   @@map("project_audits")
+}
+
+model Agreement {
+  id               String                 @id @default(uuid()) @db.Uuid
+  projectId        String                 @unique @db.Uuid
+  title            String                 @db.VarChar(150)
+  description      String?                @db.VarChar(5000)
+  scope            String?                @db.Text
+  outOfScope       String?                @db.Text
+  budget           Decimal                @db.Decimal(15, 2)
+  expectedDuration Int                    @map("expected_duration")
+  createdById      String                 @db.Uuid
+  lastUpdatedById  String                 @db.Uuid
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+  project          Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy        User                   @relation("AgreementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  lastUpdatedBy    User                   @relation("AgreementUpdatedBy", fields: [lastUpdatedById], references: [id], onDelete: Restrict)
+  participants     AgreementParticipant[]
+  audits           AgreementAudit[]
+
+  @@index([createdById])
+  @@map("agreements")
+}
+
+model AgreementParticipant {
+  id               String                    @id @default(uuid()) @db.Uuid
+  agreementId      String                    @db.Uuid
+  userId           String                    @db.Uuid
+  role             AgreementParticipantRole
+  invitationStatus AgreementInvitationStatus @default(PENDING) @map("invitation_status")
+  invitedAt        DateTime                  @default(now()) @map("invited_at")
+  respondedAt      DateTime?                 @map("responded_at")
+  joinedAt         DateTime?                 @map("joined_at")
+  createdAt        DateTime                  @default(now()) @map("created_at")
+  updatedAt        DateTime                  @updatedAt @map("updated_at")
+  agreement        Agreement                 @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  user             User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([agreementId, createdAt(sort: Desc)])
+  @@index([agreementId, userId, respondedAt])
+  @@index([userId])
+  @@index([agreementId, invitationStatus])
+  @@index([agreementId, role])
+  @@index([userId, invitationStatus])
+  @@map("agreement_participants")
+}
+
+model AgreementAudit {
+  id          String               @id @default(uuid()) @db.Uuid
+  agreementId String               @db.Uuid
+  actorId     String?              @db.Uuid
+  action      AgreementAuditAction
+  metadata    Json?
+  ipAddress   String?              @db.VarChar(45)
+  userAgent   String?              @db.VarChar(512)
+  createdAt   DateTime             @default(now()) @map("created_at")
+  agreement   Agreement            @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  actor       User?                @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([agreementId, createdAt(sort: Desc)])
+  @@index([actorId])
+  @@index([action])
+  @@map("agreement_audits")
 }

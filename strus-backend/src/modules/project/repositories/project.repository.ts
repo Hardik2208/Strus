@@ -6,7 +6,7 @@ import type {
 import { prisma } from "../../../core/database/prisma.js";
 
 import { WorkspaceRole } from "../../../generated/prisma/enums.js";
-
+import { ProjectSetupStage } from "../../../generated/prisma/enums.js";
 import type { ListProjectsDto } from "../dtos/list-projects.dto.js";
 import type { ProjectStatus } from "../../../generated/prisma/enums.js";
 
@@ -239,6 +239,36 @@ static async transferWorkspace(
     data: {
       workspaceId:
         destinationWorkspaceId,
+    },
+  });
+}
+
+static async updateSetupStage(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  setupStage: ProjectSetupStage
+): Promise<Project> {
+  return tx.project.update({
+    where: {
+      id: projectId,
+    },
+
+    data: {
+      setupStage,
+    },
+  });
+}
+
+static async findProjectForAgreement(
+  projectId: string
+) {
+  return prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+
+    include: {
+      workspace: true,
     },
   });
 }

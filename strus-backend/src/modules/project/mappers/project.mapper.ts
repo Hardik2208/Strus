@@ -18,9 +18,12 @@ export class ProjectMapper {
 
       status: project.status,
 
+      setupStage: project.setupStage,
+
       createdAt: project.createdAt,
 
       updatedAt: project.updatedAt,
+
     };
   }
 
