@@ -190,12 +190,13 @@ static async updateSetupStage(
       userId
     );
 
-  const stages = [
-    ProjectSetupStage.PROJECT_CREATED,
-    ProjectSetupStage.AGREEMENT_COMPLETED,
-    ProjectSetupStage.PROFESSIONALS_ASSIGNED,
-    ProjectSetupStage.READY_TO_START,
-  ];
+  const stages: ProjectSetupStage[] = [
+  ProjectSetupStage.PROJECT_CREATED,
+  ProjectSetupStage.AGREEMENT_COMPLETED,
+  ProjectSetupStage.PROFESSIONALS_ASSIGNED,
+  ProjectSetupStage.MILESTONES_CREATED,
+  ProjectSetupStage.READY_TO_START,
+];
 
   const currentIndex =
     stages.indexOf(

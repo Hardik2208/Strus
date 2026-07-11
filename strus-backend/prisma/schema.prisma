@@ -108,6 +108,7 @@ enum ProjectSetupStage {
   PROJECT_CREATED
   AGREEMENT_COMPLETED
   PROFESSIONALS_ASSIGNED
+  MILESTONES_CREATED
   READY_TO_START
 }
 
@@ -133,6 +134,47 @@ enum AgreementAuditAction {
   INVITATION_WITHDRAWN
 
   PROFESSIONAL_REMOVED
+}
+
+enum MilestoneStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  REVISION_REQUESTED
+  REVISION_LIMIT_REACHED
+  COMPLETED
+}
+
+enum ExecutionAuditAction {
+  MILESTONE_CREATED
+  MILESTONE_UPDATED
+  MILESTONE_DELETED
+
+  MILESTONE_STARTED
+  MILESTONE_SUBMITTED
+  MILESTONE_APPROVED
+  MILESTONE_REJECTED
+
+  DEPENDENCY_CREATED
+  DEPENDENCY_REMOVED
+
+  EXTENSION_GRANTED
+
+  REVISION_REQUESTED
+  REVISION_SUBMITTED
+  REVISION_LIMIT_REACHED
+
+  PROJECT_ASSET_CREATED
+  PROJECT_ASSET_UPDATED
+  PROJECT_ASSET_DELETED
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REVISION_REQUESTED
+  REJECTED
 }
 
 //
@@ -202,11 +244,25 @@ model User {
 
   sessions Session[]
 
+  milestonesCreated Milestone[] @relation("MilestoneCreatedBy")
+
+  milestonesUpdated Milestone[] @relation("MilestoneUpdatedBy")
+
+  executionAudits ExecutionAudit[] @relation("ExecutionAuditActor")
+
+  milestoneExtensions MilestoneExtension[] @relation("MilestoneExtensionApprovedBy")
+
+  createdProjectAssets ProjectAsset[] @relation("ProjectAssetCreatedBy")
+
   clientReputation ClientReputation?
 
   professionalReputation ProfessionalReputation?
   projects               Project[]
   projectAudits          ProjectAudit[]
+
+  submittedMilestoneSubmissions MilestoneSubmission[] @relation("MilestoneSubmissionSubmittedBy")
+
+  reviewedMilestoneSubmissions MilestoneSubmission[] @relation("MilestoneSubmissionReviewedBy")
 
   @@index([status])
   @@index([verificationLevel])
@@ -520,6 +576,11 @@ model Project {
   audits    ProjectAudit[]
   agreement Agreement?
 
+  milestones               Milestone[]
+  executionAudits          ExecutionAudit[]
+  projectAssets            ProjectAsset[]
+  projectAssetVisibilities ProjectAssetVisibility[]
+
   @@index([workspaceId])
   @@index([createdById])
   @@index([status])
@@ -553,6 +614,12 @@ model ProjectAudit {
   @@index([createdAt])
   @@map("project_audits")
 }
+
+//
+// ======================================================
+// Agreement
+// ======================================================
+//
 
 model Agreement {
   id               String                 @id @default(uuid()) @db.Uuid
@@ -591,6 +658,9 @@ model AgreementParticipant {
   agreement        Agreement                 @relation(fields: [agreementId], references: [id], onDelete: Cascade)
   user             User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  milestones           Milestone[]
+  visibleProjectAssets ProjectAssetVisibility[]
+
   @@index([agreementId, createdAt(sort: Desc)])
   @@index([agreementId, userId, respondedAt])
   @@index([userId])
@@ -616,4 +686,372 @@ model AgreementAudit {
   @@index([actorId])
   @@index([action])
   @@map("agreement_audits")
+}
+
+//
+// ======================================================
+// Execution
+// ======================================================
+//
+
+model Milestone {
+  id String @id @default(uuid()) @db.Uuid
+
+  projectId String @map("project_id") @db.Uuid
+
+  agreementParticipantId String @map("agreement_participant_id") @db.Uuid
+
+  order Int
+
+  allocatedDays Int @map("allocated_days")
+
+  carryForwardDays Int @default(0) @map("carry_forward_days")
+
+  extensionDays Int @default(0) @map("extension_days")
+
+  paymentAllocation Decimal @map("payment_allocation") @db.Decimal(18, 2)
+
+  revisionLimit Int @default(0) @map("revision_limit")
+
+  revisionCount Int @default(0) @map("revision_count")
+
+  status MilestoneStatus @default(NOT_STARTED)
+
+  startedAt DateTime? @map("started_at")
+
+  submittedAt DateTime? @map("submitted_at")
+
+  completedAt DateTime? @map("completed_at")
+
+  createdById String @map("created_by_id") @db.Uuid
+
+  updatedById String @map("updated_by_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  deletedAt DateTime? @map("deleted_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  agreementParticipant AgreementParticipant @relation(fields: [agreementParticipantId], references: [id], onDelete: Restrict)
+
+  createdBy User @relation("MilestoneCreatedBy", fields: [createdById], references: [id])
+
+  updatedBy User @relation("MilestoneUpdatedBy", fields: [updatedById], references: [id])
+
+  dependencies MilestoneDependency[] @relation("MilestoneDependencies")
+
+  dependsOn MilestoneDependency[] @relation("DependsOnMilestone")
+
+  acceptanceCriteria MilestoneAcceptanceCriteria[]
+
+  deliverables MilestoneDeliverable[]
+
+  extensions      MilestoneExtension[]
+  executionAudits ExecutionAudit[]
+  requirements    MilestoneRequirement[]
+  submissions     MilestoneSubmission[]
+
+  @@unique([agreementParticipantId, order])
+  @@index([projectId])
+  @@index([agreementParticipantId])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("milestones")
+}
+
+model MilestoneDependency {
+  id String @id @default(uuid()) @db.Uuid
+
+  milestoneId String @map("milestone_id") @db.Uuid
+
+  dependsOnMilestoneId String @map("depends_on_milestone_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  milestone Milestone @relation("MilestoneDependencies", fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  dependsOn Milestone @relation("DependsOnMilestone", fields: [dependsOnMilestoneId], references: [id], onDelete: Cascade)
+
+  @@unique([milestoneId, dependsOnMilestoneId])
+  @@index([milestoneId])
+  @@index([dependsOnMilestoneId])
+  @@map("milestone_dependencies")
+}
+
+model MilestoneExtension {
+  id String @id @default(uuid()) @db.Uuid
+
+  milestoneId String @map("milestone_id") @db.Uuid
+
+  daysAdded Int @map("days_added")
+
+  reason String? @db.Text
+
+  approvedById String @map("approved_by_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  milestone Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  approvedBy User @relation("MilestoneExtensionApprovedBy", fields: [approvedById], references: [id])
+
+  @@index([milestoneId])
+  @@map("milestone_extensions")
+}
+
+model ExecutionAudit {
+  id String @id @default(uuid()) @db.Uuid
+
+  projectId String @map("project_id") @db.Uuid
+
+  actorId String? @map("actor_id") @db.Uuid
+
+  milestoneId String? @map("milestone_id") @db.Uuid
+
+  action ExecutionAuditAction
+
+  metadata Json?
+
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+
+  userAgent String? @map("user_agent") @db.VarChar(512)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  actor User? @relation("ExecutionAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  milestone Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([milestoneId])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("execution_audits")
+}
+
+model MilestoneRequirement {
+  id String @id @default(uuid()) @db.Uuid
+
+  milestoneId String @map("milestone_id") @db.Uuid
+
+  content String @db.Text
+
+  order Int
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  milestone Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@unique([milestoneId, order])
+  @@index([milestoneId])
+  @@map("milestone_requirements")
+}
+
+model MilestoneDeliverable {
+  id String @id @default(uuid()) @db.Uuid
+
+  milestoneId String @map("milestone_id") @db.Uuid
+
+  content String @db.Text
+
+  order Int
+
+  isMandatory Boolean @default(true) @map("is_mandatory")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  milestone Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@unique([milestoneId, order])
+  @@index([milestoneId])
+  @@map("milestone_deliverables")
+}
+
+model MilestoneAcceptanceCriteria {
+  id String @id @default(uuid()) @db.Uuid
+
+  milestoneId String @map("milestone_id") @db.Uuid
+
+  content String @db.Text
+
+  order Int
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  milestone Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@unique([milestoneId, order])
+  @@index([milestoneId])
+  @@map("milestone_acceptance_criteria")
+}
+
+model ProjectAsset {
+  id String @id @default(uuid()) @db.Uuid
+
+  projectId String @map("project_id") @db.Uuid
+
+  createdById String @map("created_by_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  deletedAt DateTime? @map("deleted_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdBy User @relation("ProjectAssetCreatedBy", fields: [createdById], references: [id])
+
+  files ProjectAssetFile[]
+
+  visibleToParticipants ProjectAssetVisibility[]
+
+  @@index([projectId])
+  @@index([deletedAt])
+  @@map("project_assets")
+}
+
+model ProjectAssetFile {
+  id String @id @default(uuid()) @db.Uuid
+
+  projectAssetId String @map("project_asset_id") @db.Uuid
+
+  publicId String @map("public_id") @db.VarChar(255)
+
+  url String @db.Text
+
+  originalName String @map("original_name") @db.VarChar(255)
+
+  mimeType String @map("mime_type") @db.VarChar(100)
+
+  extension String @db.VarChar(20)
+
+  size BigInt
+
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  asset ProjectAsset @relation(fields: [projectAssetId], references: [id], onDelete: Cascade)
+
+  @@index([projectAssetId])
+  @@map("project_asset_files")
+}
+
+model ProjectAssetVisibility {
+  id String @id @default(uuid()) @db.Uuid
+
+  projectId String @map("project_id") @db.Uuid
+
+  projectAssetId String @map("project_asset_id") @db.Uuid
+
+  agreementParticipantId String @map("agreement_participant_id") @db.Uuid
+
+  asset ProjectAsset @relation(fields: [projectAssetId], references: [id], onDelete: Cascade)
+
+  participant AgreementParticipant @relation(fields: [agreementParticipantId], references: [id], onDelete: Cascade)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectAssetId, agreementParticipantId])
+  @@index([projectId])
+  @@index([agreementParticipantId])
+  @@map("project_asset_visibility")
+}
+
+model MilestoneSubmission {
+  id String @id @default(uuid()) @db.Uuid
+
+  milestoneId String @map("milestone_id") @db.Uuid
+
+  submittedById String @map("submitted_by_id") @db.Uuid
+
+  submissionNumber Int @map("submission_number")
+
+  notes String? @db.Text
+
+  status SubmissionStatus @default(SUBMITTED)
+
+  reviewedById String? @map("reviewed_by_id") @db.Uuid
+
+  reviewComment String? @map("review_comment") @db.Text
+
+  submittedAt DateTime @default(now()) @map("submitted_at")
+
+  reviewedAt DateTime? @map("reviewed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  deletedAt DateTime? @map("deleted_at")
+
+  milestone Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  submittedBy User @relation("MilestoneSubmissionSubmittedBy", fields: [submittedById], references: [id])
+
+  reviewedBy User? @relation("MilestoneSubmissionReviewedBy", fields: [reviewedById], references: [id])
+
+  files MilestoneSubmissionFile[]
+
+  links MilestoneSubmissionLink[]
+
+  @@unique([milestoneId, submissionNumber])
+  @@index([milestoneId])
+  @@index([submittedById])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("milestone_submissions")
+}
+
+model MilestoneSubmissionFile {
+  id String @id @default(uuid()) @db.Uuid
+
+  submissionId String @map("submission_id") @db.Uuid
+
+  publicId String @map("public_id")
+
+  url String
+
+  originalName String @map("original_name")
+
+  mimeType String @map("mime_type")
+
+  extension String
+
+  size BigInt
+
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  submission MilestoneSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@map("milestone_submission_files")
+}
+
+model MilestoneSubmissionLink {
+  id String @id @default(uuid()) @db.Uuid
+
+  submissionId String @map("submission_id") @db.Uuid
+
+  label String @db.VarChar(100)
+
+  url String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  submission MilestoneSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@map("milestone_submission_links")
 }
