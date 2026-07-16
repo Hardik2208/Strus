@@ -12,6 +12,7 @@ import { ProjectValidator } from "../validators/project.validator.js";
 import { ProjectPermissionService } from "./project-permission.service.js";
 import { ProjectAuditCache } from "../cache/project-audit.cache.js";
 import { AgreementService } from "../../agreement/services/agreement.service.js";
+import { ExecutionService } from "../../execution/services/execution.service.js";
 
 export class ProjectService {
   // ==================================================
@@ -192,8 +193,6 @@ static async updateSetupStage(
 
   const stages: ProjectSetupStage[] = [
   ProjectSetupStage.PROJECT_CREATED,
-  ProjectSetupStage.AGREEMENT_COMPLETED,
-  ProjectSetupStage.PROFESSIONALS_ASSIGNED,
   ProjectSetupStage.MILESTONES_CREATED,
   ProjectSetupStage.READY_TO_START,
 ];
@@ -296,22 +295,34 @@ static async updateSetupStage(
   switch (project.status) {
     case ProjectStatus.DRAFT:
       if (status === ProjectStatus.ACTIVE) {
-        if (
-          project.setupStage !==
-          ProjectSetupStage.READY_TO_START
-        ) {
-          throw new AppError(
-            "Project setup is not complete.",
-            400,
-            ErrorCode.INVALID_PROJECT_STATUS_TRANSITION
-          );
-        }
-
         await AgreementService.ensureProjectCanBeActivated(
-          projectId
-        );
+  projectId
+);
 
-        break;
+await ExecutionService.ensureProjectReady(
+  tx,
+  projectId
+);
+
+const latestProject =
+  await ProjectRepository.findProjectByIdTx(
+    tx,
+    projectId
+  );
+
+if (
+  !latestProject ||
+  latestProject.setupStage !==
+    ProjectSetupStage.READY_TO_START
+) {
+  throw new AppError(
+    "Project setup is not complete.",
+    400,
+    ErrorCode.INVALID_PROJECT_STATUS_TRANSITION
+  );
+}
+
+break;
       }
 
       if (
@@ -365,6 +376,13 @@ static async updateSetupStage(
       projectId,
       status
     );
+
+  if (status === ProjectStatus.ACTIVE) {
+  await ExecutionService.startExecution(
+    tx,
+    projectId
+  );
+}
 
   await ProjectAuditRepository.create(tx, {
     projectId,

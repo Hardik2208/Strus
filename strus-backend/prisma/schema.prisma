@@ -177,6 +177,19 @@ enum SubmissionStatus {
   REJECTED
 }
 
+enum SubmissionAttachmentType {
+  DOCUMENT
+  IMAGE
+  VIDEO
+  ARCHIVE
+  OTHER
+}
+
+enum SubmissionTiming {
+  ON_TIME
+  LATE
+}
+
 //
 // ======================================================
 // AUTHENTICATION
@@ -263,6 +276,8 @@ model User {
   submittedMilestoneSubmissions MilestoneSubmission[] @relation("MilestoneSubmissionSubmittedBy")
 
   reviewedMilestoneSubmissions MilestoneSubmission[] @relation("MilestoneSubmissionReviewedBy")
+
+  revisionRequests RevisionRequest[] @relation("RevisionRequestedBy")
 
   @@index([status])
   @@index([verificationLevel])
@@ -705,8 +720,6 @@ model Milestone {
 
   allocatedDays Int @map("allocated_days")
 
-  carryForwardDays Int @default(0) @map("carry_forward_days")
-
   extensionDays Int @default(0) @map("extension_days")
 
   paymentAllocation Decimal @map("payment_allocation") @db.Decimal(18, 2)
@@ -741,18 +754,15 @@ model Milestone {
 
   updatedBy User @relation("MilestoneUpdatedBy", fields: [updatedById], references: [id])
 
-  dependencies MilestoneDependency[] @relation("MilestoneDependencies")
-
-  dependsOn MilestoneDependency[] @relation("DependsOnMilestone")
-
   acceptanceCriteria MilestoneAcceptanceCriteria[]
 
   deliverables MilestoneDeliverable[]
 
-  extensions      MilestoneExtension[]
-  executionAudits ExecutionAudit[]
-  requirements    MilestoneRequirement[]
-  submissions     MilestoneSubmission[]
+  extensions       MilestoneExtension[]
+  executionAudits  ExecutionAudit[]
+  requirements     MilestoneRequirement[]
+  submissions      MilestoneSubmission[]
+  revisionRequests RevisionRequest[]
 
   @@unique([agreementParticipantId, order])
   @@index([projectId])
@@ -760,25 +770,6 @@ model Milestone {
   @@index([status])
   @@index([deletedAt])
   @@map("milestones")
-}
-
-model MilestoneDependency {
-  id String @id @default(uuid()) @db.Uuid
-
-  milestoneId String @map("milestone_id") @db.Uuid
-
-  dependsOnMilestoneId String @map("depends_on_milestone_id") @db.Uuid
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  milestone Milestone @relation("MilestoneDependencies", fields: [milestoneId], references: [id], onDelete: Cascade)
-
-  dependsOn Milestone @relation("DependsOnMilestone", fields: [dependsOnMilestoneId], references: [id], onDelete: Cascade)
-
-  @@unique([milestoneId, dependsOnMilestoneId])
-  @@index([milestoneId])
-  @@index([dependsOnMilestoneId])
-  @@map("milestone_dependencies")
 }
 
 model MilestoneExtension {
@@ -978,13 +969,13 @@ model MilestoneSubmission {
 
   submissionNumber Int @map("submission_number")
 
-  notes String? @db.Text
+  content String? @db.Text
 
   status SubmissionStatus @default(SUBMITTED)
 
-  reviewedById String? @map("reviewed_by_id") @db.Uuid
+  timing SubmissionTiming @default(ON_TIME)
 
-  reviewComment String? @map("review_comment") @db.Text
+  reviewedById String? @map("reviewed_by_id") @db.Uuid
 
   submittedAt DateTime @default(now()) @map("submitted_at")
 
@@ -998,15 +989,15 @@ model MilestoneSubmission {
 
   milestone Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
 
-  submittedBy User @relation("MilestoneSubmissionSubmittedBy", fields: [submittedById], references: [id])
+  submittedBy User @relation("MilestoneSubmissionSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
 
-  reviewedBy User? @relation("MilestoneSubmissionReviewedBy", fields: [reviewedById], references: [id])
+  reviewedBy User? @relation("MilestoneSubmissionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
 
-  files MilestoneSubmissionFile[]
-
-  links MilestoneSubmissionLink[]
+  attachments     SubmissionAttachment[]
+  revisionRequest RevisionRequest?
 
   @@unique([milestoneId, submissionNumber])
+  @@index([reviewedById])
   @@index([milestoneId])
   @@index([submittedById])
   @@index([status])
@@ -1014,20 +1005,22 @@ model MilestoneSubmission {
   @@map("milestone_submissions")
 }
 
-model MilestoneSubmissionFile {
+model SubmissionAttachment {
   id String @id @default(uuid()) @db.Uuid
 
   submissionId String @map("submission_id") @db.Uuid
 
-  publicId String @map("public_id")
+  publicId String @map("public_id") @db.VarChar(255)
 
-  url String
+  url String @db.Text
 
-  originalName String @map("original_name")
+  originalName String @map("original_name") @db.VarChar(255)
 
-  mimeType String @map("mime_type")
+  mimeType String @map("mime_type") @db.VarChar(100)
 
-  extension String
+  extension String @db.VarChar(20)
+
+  attachmentType SubmissionAttachmentType @map("attachment_type")
 
   size BigInt
 
@@ -1036,22 +1029,31 @@ model MilestoneSubmissionFile {
   submission MilestoneSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
   @@index([submissionId])
-  @@map("milestone_submission_files")
+  @@index([attachmentType])
+  @@map("submission_attachments")
 }
 
-model MilestoneSubmissionLink {
-  id String @id @default(uuid()) @db.Uuid
+model RevisionRequest {
+  id String @id @default(cuid())
 
-  submissionId String @map("submission_id") @db.Uuid
+  milestoneId String    @db.Uuid
+  milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
 
-  label String @db.VarChar(100)
+  submissionId String              @db.Uuid
+  submission   MilestoneSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
-  url String
+  requestedById String @db.Uuid
+  requestedBy   User   @relation("RevisionRequestedBy", fields: [requestedById], references: [id])
 
-  createdAt DateTime @default(now()) @map("created_at")
+  revisionNumber Int
 
-  submission MilestoneSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  content String
 
-  @@index([submissionId])
-  @@map("milestone_submission_links")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([submissionId])
+  @@index([milestoneId, revisionNumber])
+  @@index([milestoneId])
+  @@index([requestedById])
 }

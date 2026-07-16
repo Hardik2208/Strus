@@ -48,4 +48,20 @@ AGREEMENT_CREATED:
 AGREEMENT_INVITATION_CREATED:
   "agreement:invitation:created",
 
+// ==================================================
+// Execution
+// ==================================================
+
+SUBMISSION_CREATED:
+  "execution:submission:created",
+
+SUBMISSION_APPROVED:
+  "execution:submission:approved",
+
+SUBMISSION_REVISION_REQUESTED:
+  "execution:submission:revision-requested",
+
+PENDING_REVIEWS_UPDATED:
+  "execution:pending-reviews:updated",
+
 } as const;

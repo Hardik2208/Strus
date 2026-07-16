@@ -3,7 +3,9 @@ import { prisma } from "../../../core/database/prisma.js";
 import type {
   ProjectAsset,
 } from "../../../generated/prisma/client.js";
+import util from "node:util";
 
+import type { Prisma } from "../../../generated/prisma/client.js";
 import {
   ExecutionAuditAction,
 } from "../../../generated/prisma/enums.js";
@@ -12,7 +14,7 @@ import { AppError } from "../../../core/errors/AppError.js";
 import { ErrorCode } from "../../../core/errors/ErrorCodes.js";
 
 import { CloudinaryService } from "../../../core/storage/cloudinary.service.js";
-
+import { ProjectPermissionService } from "../../project/services/project-permission.service.js";
 import type { CreateProjectAssetDto } from "../dtos/create-project-asset.dto.js";
 
 import { ExecutionPermissionService } from "./execution-permission.service.js";
@@ -20,7 +22,6 @@ import { ExecutionPermissionService } from "./execution-permission.service.js";
 import { ExecutionRepository } from "../repositories/execution.repository.js";
 import { ProjectAssetRepository } from "../repositories/project-asset.repository.js";
 import { ExecutionAuditRepository } from "../repositories/execution-audit.repository.js";
-
 import { ProjectAssetValidator } from "../validators/project-asset.validator.js";
 
 import { ProjectAssetCache } from "../cache/project-asset.cache.js";
@@ -31,45 +32,52 @@ export class ProjectAssetService {
   // ==================================================
 
   static async create(
-    projectId: string,
-    userId: string,
-    dto: CreateProjectAssetDto,
-    files: Express.Multer.File[]
-  ): Promise<ProjectAsset> {
-    await ExecutionPermissionService.ensureExecutionPlanEditable(
-      projectId,
-      userId
-    );
+  projectId: string,
+  userId: string,
+  dto: CreateProjectAssetDto,
+  files: Express.Multer.File[]
+): Promise<ProjectAsset> {
+  await ExecutionPermissionService.ensureExecutionAccess(
+    projectId,
+    userId
+  );
 
-    ProjectAssetValidator.validateParticipants(
-      dto.visibleToParticipants
-    );
+  ProjectAssetValidator.validateFiles(
+    files
+  );
 
-    ProjectAssetValidator.validateFiles(
-      files
-    );
+  const participantIds = Array.isArray(
+    dto.visibleToParticipants
+  )
+    ? dto.visibleToParticipants
+    : [dto.visibleToParticipants];
 
-    const uploadedFiles =
-      await this.uploadFiles(files);
+  ProjectAssetValidator.validateParticipants(
+    participantIds
+  );
 
-    try {
-      return await prisma.$transaction(
+  const uploadedFiles =
+    await this.uploadFiles(files);
+
+  try {
+    const asset =
+      await prisma.$transaction(
         async (tx) => {
           const participants =
             await ExecutionRepository.findAgreementParticipantsByIds(
               tx,
               projectId,
-              dto.visibleToParticipants
+              participantIds
             );
 
           if (
             participants.length !==
-            dto.visibleToParticipants.length
+            participantIds.length
           ) {
             throw new AppError(
-              "Invalid participants selected.",
+              "One or more professionals are invalid.",
               400,
-              ErrorCode.INVALID_REQUEST
+              ErrorCode.INVALID_PROJECT_ASSET
             );
           }
 
@@ -126,9 +134,7 @@ export class ProjectAssetService {
           await ProjectAssetRepository.createVisibility(
             tx,
             participants.map(
-              (
-                participant
-              ) => ({
+              (participant) => ({
                 projectId,
 
                 projectAssetId:
@@ -159,35 +165,51 @@ export class ProjectAssetService {
                 ExecutionAuditAction.PROJECT_ASSET_CREATED,
 
               metadata: {
-                assetId:
-                  asset.id,
-
+                assetId: asset.id,
                 files:
                   uploadedFiles.length,
+                visibleTo:
+                  participantIds,
               },
             }
-          );
-
-          await ProjectAssetCache.invalidate(
-            projectId
           );
 
           return asset;
         }
       );
-    } catch (error) {
-      await Promise.all(
-        uploadedFiles.map(
-          ({ upload }) =>
-            CloudinaryService.delete(
-              upload.publicId
-            )
-        )
-      );
 
-      throw error;
-    }
+    await ProjectAssetCache.invalidate(
+      projectId
+    );
+
+    return asset;
+  } catch (error) {
+    await Promise.all(
+      uploadedFiles.map(
+        ({ upload }) =>
+          CloudinaryService.delete(
+            upload.publicId,
+            this.determineResourceType(
+              upload.format.startsWith("mp4") ||
+                upload.format.startsWith(
+                  "mov"
+                ) ||
+                upload.format.startsWith(
+                  "avi"
+                ) ||
+                upload.format.startsWith(
+                  "mkv"
+                )
+                ? "video/mp4"
+                : "image/png"
+            )
+          )
+      )
+    );
+
+    throw error;
   }
+}
 
   // ==================================================
   // Upload Files
@@ -265,13 +287,42 @@ export class ProjectAssetService {
     userId: string
   ) {
     await ExecutionPermissionService.ensureExecutionAccess(
+  projectId,
+  userId
+);
+
+const project =
+  await ProjectPermissionService.ensureProjectExists(
+    projectId
+);
+
+if (project.createdById === userId) {
+  return ProjectAssetRepository.findProjectAssets(
+    projectId
+  );
+}
+
+const participant =
+  await prisma.$transaction((tx) =>
+    ExecutionRepository.findAgreementParticipantByUser(
+      tx,
       projectId,
       userId
-    );
+    )
+  );
 
-    return ProjectAssetRepository.findProjectAssets(
-      projectId
-    );
+if (!participant) {
+  throw new AppError(
+    "Access denied.",
+    403,
+    ErrorCode.INSUFFICIENT_PERMISSIONS
+  );
+}
+
+return ProjectAssetRepository.findVisibleAssets(
+  projectId,
+  participant.id
+);
   }
 
   // ==================================================
@@ -284,25 +335,58 @@ export class ProjectAssetService {
     userId: string
   ) {
     await ExecutionPermissionService.ensureExecutionAccess(
+  projectId,
+  userId
+);
+
+const project =
+  await ProjectPermissionService.ensureProjectExists(
+    projectId
+);
+
+let asset;
+
+if (project.createdById === userId) {
+  asset =
+    await ProjectAssetRepository.findProjectAsset(
       projectId,
-      userId
+      assetId
+    );
+} else {
+  const participant =
+    await prisma.$transaction((tx) =>
+      ExecutionRepository.findAgreementParticipantByUser(
+        tx,
+        projectId,
+        userId
+      )
     );
 
-    const asset =
-      await ProjectAssetRepository.findProjectAsset(
-        projectId,
-        assetId
-      );
+  if (!participant) {
+    throw new AppError(
+      "Access denied.",
+      403,
+      ErrorCode.INSUFFICIENT_PERMISSIONS
+    );
+  }
 
-    if (!asset) {
-      throw new AppError(
-        "Project asset not found.",
-        404,
-        ErrorCode.PROJECT_ASSET_NOT_FOUND
-      );
-    }
+  asset =
+    await ProjectAssetRepository.findVisibleAsset(
+      projectId,
+      assetId,
+      participant.id
+    );
+}
 
-    return asset;
+if (!asset) {
+  throw new AppError(
+    "Project asset not found.",
+    404,
+    ErrorCode.PROJECT_ASSET_NOT_FOUND
+  );
+}
+
+return asset;
   }
 
   // ==================================================
@@ -315,7 +399,7 @@ export class ProjectAssetService {
     userId: string,
     files: Express.Multer.File[]
   ): Promise<void> {
-    await ExecutionPermissionService.ensureExecutionPlanEditable(
+    await ExecutionPermissionService.ensureProjectAssetManagement(
       projectId,
       userId
     );
@@ -432,7 +516,7 @@ export class ProjectAssetService {
     assetId: string,
     userId: string
   ): Promise<void> {
-    await ExecutionPermissionService.ensureExecutionPlanEditable(
+    await ExecutionPermissionService.ensureProjectAssetManagement(
       projectId,
       userId
     );

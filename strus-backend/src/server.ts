@@ -8,6 +8,8 @@ import { env } from "./core/config/env.js";
 import { connectRedis } from "./core/cache/redis.js";
 import { logger } from "./core/logger/index.js";
 
+import { ExecutionScheduler } from "./modules/execution/jobs/execution.scheduler.js";
+
 async function bootstrap() {
   try {
     await connectRedis();
@@ -16,6 +18,8 @@ async function bootstrap() {
       createServer(app);
 
     initializeSocket(httpServer);
+
+    ExecutionScheduler.start();
 
     httpServer.listen(
       env.PORT,
@@ -29,6 +33,8 @@ async function bootstrap() {
 
     const shutdown = async () => {
       logger.info("Shutting down...");
+
+      ExecutionScheduler.stop();
 
       httpServer.close(() => {
         process.exit(0);

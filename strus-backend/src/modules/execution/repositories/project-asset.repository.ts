@@ -66,24 +66,49 @@ export class ProjectAssetRepository {
         },
 
         visibleToParticipants: {
-          include: {
-            participant: {
-              include: {
-                user: {
-                  include: {
-                    profile: true,
-                  },
-                },
+  select: {
+    id: true,
+    agreementParticipantId: true,
+
+    participant: {
+      select: {
+        id: true,
+
+        role: true,
+
+        user: {
+          select: {
+            id: true,
+
+            profile: {
+              select: {
+                username: true,
+                firstName: true,
+                lastName: true,
+                avatarUrl: true,
               },
             },
           },
         },
+      },
+    },
+  },
+},
 
         createdBy: {
-          include: {
-            profile: true,
-          },
-        },
+  select: {
+    id: true,
+
+    profile: {
+      select: {
+        username: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+      },
+    },
+  },
+},
       },
 
       orderBy: {
@@ -117,18 +142,34 @@ export class ProjectAssetRepository {
         },
 
         visibleToParticipants: {
-          include: {
-            participant: {
-              include: {
-                user: {
-                  include: {
-                    profile: true,
-                  },
-                },
+  select: {
+    id: true,
+    agreementParticipantId: true,
+
+    participant: {
+      select: {
+        id: true,
+
+        role: true,
+
+        user: {
+          select: {
+            id: true,
+
+            profile: {
+              select: {
+                username: true,
+                firstName: true,
+                lastName: true,
+                avatarUrl: true,
               },
             },
           },
         },
+      },
+    },
+  },
+},
 
         createdBy: {
           include: {
@@ -224,4 +265,107 @@ export class ProjectAssetRepository {
       },
     });
   }
+
+  // ==================================================
+// Visible Assets
+// ==================================================
+
+static findVisibleAssets(
+  projectId: string,
+  agreementParticipantId: string
+) {
+  return prisma.projectAsset.findMany({
+    where: {
+      projectId,
+
+      deletedAt: null,
+
+      visibleToParticipants: {
+        some: {
+          agreementParticipantId,
+        },
+      },
+    },
+
+    include: {
+      files: {
+        orderBy: {
+          uploadedAt: "asc",
+        },
+      },
+
+      visibleToParticipants: {
+  where: {
+    agreementParticipantId,
+  },
+
+  select: {
+    id: true,
+    agreementParticipantId: true,
+  },
+},
+
+      createdBy: {
+        include: {
+          profile: true,
+        },
+      },
+    },
+
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+}
+
+// ==================================================
+// Visible Asset
+// ==================================================
+
+static findVisibleAsset(
+  projectId: string,
+  assetId: string,
+  agreementParticipantId: string
+) {
+  return prisma.projectAsset.findFirst({
+    where: {
+      id: assetId,
+
+      projectId,
+
+      deletedAt: null,
+
+      visibleToParticipants: {
+        some: {
+          agreementParticipantId,
+        },
+      },
+    },
+
+    include: {
+      files: {
+        orderBy: {
+          uploadedAt: "asc",
+        },
+      },
+
+      visibleToParticipants: {
+  where: {
+    agreementParticipantId,
+  },
+
+  select: {
+    id: true,
+    agreementParticipantId: true,
+  },
+},
+
+      createdBy: {
+        include: {
+          profile: true,
+        },
+      },
+    },
+  });
+}
 }

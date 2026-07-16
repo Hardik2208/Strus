@@ -63,12 +63,13 @@ export class MilestoneExtensionService {
       );
     }
 
-    await ExecutionRepository.incrementExtensionDays(
-        tx,
-        dto.milestoneId,
-        dto.daysAdded,
-        userId
-    );
+    const updatedMilestone =
+  await ExecutionRepository.incrementExtensionDays(
+    tx,
+    dto.milestoneId,
+    dto.daysAdded,
+    userId
+  );
 
     const extension =
       await MilestoneExtensionRepository.create(
@@ -116,6 +117,11 @@ export class MilestoneExtensionService {
 
       metadata: {
         daysAdded: dto.daysAdded,
+
+        totalExtensionDays:
+          updatedMilestone.extensionDays,
+
+        reason: dto.reason.trim(),
       },
     });
 

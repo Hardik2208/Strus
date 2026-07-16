@@ -272,4 +272,37 @@ static async findProjectForAgreement(
     },
   });
 }
+
+static async findProjectByIdTx(
+  tx: Prisma.TransactionClient,
+  projectId: string
+) {
+  return tx.project.findFirst({
+    where: {
+      id: projectId,
+      deletedAt: null,
+    },
+
+    include: {
+      workspace: {
+        select: {
+          id: true,
+        },
+      },
+
+      createdBy: {
+        include: {
+          profile: {
+            select: {
+              username: true,
+              firstName: true,
+              lastName: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
 }

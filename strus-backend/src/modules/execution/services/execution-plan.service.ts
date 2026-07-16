@@ -15,7 +15,7 @@ import type { CreateExecutionPlanDto } from "../dtos/create-execution-plan.dto.j
 import { MilestoneSpecificationService } from "./milestone-specification.service.js";
 import { ExecutionRepository } from "../repositories/execution.repository.js";
 import { ExecutionAuditRepository } from "../repositories/execution-audit.repository.js";
-
+import { ProjectCache } from "../../project/cache/project.cache.js"
 import { ExecutionPermissionService } from "./execution-permission.service.js";
 
 import { ExecutionValidator } from "../validators/execution.validator.js";
@@ -26,224 +26,23 @@ export class MilestoneService {
   // ==================================================
 
   static async createExecutionPlan(
-    tx: Prisma.TransactionClient,
-    projectId: string,
-    userId: string,
-    dto: CreateExecutionPlanDto
-  ): Promise<Milestone[]> {
-    // ------------------------------------------
-    // Permission
-    // ------------------------------------------
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  userId: string,
+  dto: CreateExecutionPlanDto
+): Promise<Milestone[]> {
+  await ExecutionPermissionService.ensureExecutionPlanCreatable(
+    projectId,
+    userId
+  );
 
-    await ExecutionPermissionService.ensureExecutionPlanEditable(
-  projectId,
-  userId
-);
-
-    // ------------------------------------------
-    // Agreement
-    // ------------------------------------------
-
-    const agreement =
-      await ExecutionRepository.findAgreementByProjectId(
-        tx,
-        projectId
-      );
-
-    if (!agreement) {
-      throw new AppError(
-        "Agreement not found.",
-        404,
-        ErrorCode.AGREEMENT_NOT_FOUND
-      );
-    }
-
-    // ------------------------------------------
-    // Validation
-    // ------------------------------------------
-
-    let totalAllocation = 0;
-
-    const participantIds =
-      new Set<string>();
-
-    const validParticipants =
-      new Set(
-        agreement.participants.map(
-          (participant) =>
-            participant.id
-        )
-      );
-
-    const milestonesToCreate: Prisma.MilestoneCreateManyInput[] =
-      [];
-
-    for (const professional of dto.professionals) {
-      if (
-        participantIds.has(
-          professional.agreementParticipantId
-        )
-      ) {
-        throw new AppError(
-          "Duplicate professional found.",
-          400,
-          ErrorCode.INVALID_REQUEST
-        );
-      }
-
-      participantIds.add(
-        professional.agreementParticipantId
-      );
-
-      if (
-        !validParticipants.has(
-          professional.agreementParticipantId
-        )
-      ) {
-        throw new AppError(
-          "Invalid agreement participant.",
-          400,
-          ErrorCode.INVALID_REQUEST
-        );
-      }
-
-      professional.milestones.forEach(
-        (milestone, index) => {
-
-          ExecutionValidator.validateAllocatedDays(
-            milestone.allocatedDays
-          );
-
-          ExecutionValidator.validatePaymentAllocation(
-            milestone.paymentAllocation
-          );
-
-          ExecutionValidator.validateRevisionLimit(
-            milestone.revisionLimit
-          );
-
-          totalAllocation +=
-            milestone.paymentAllocation;
-
-          milestonesToCreate.push({
-            projectId,
-
-            agreementParticipantId:
-              professional.agreementParticipantId,
-
-            order: index + 1,
-
-            allocatedDays:
-              milestone.allocatedDays,
-
-            paymentAllocation:
-              milestone.paymentAllocation,
-
-            revisionLimit:
-              milestone.revisionLimit,
-
-            createdById: userId,
-
-            updatedById: userId,
-          });
-        }
-      );
-    }
-
-    if (
-      Number(totalAllocation) !==
-      Number(agreement.budget)
-    ) {
-      throw new AppError(
-        "Milestone payment allocation must equal the agreement budget.",
-        400,
-        ErrorCode.INVALID_PAYMENT_ALLOCATION
-      );
-    }
-
-    // ------------------------------------------
-    // Create Milestones
-    // ------------------------------------------
-
-    await ExecutionRepository.createMilestones(
-      tx,
-      milestonesToCreate
-    );
-
-    const milestones =
-      await ExecutionRepository.findProjectMilestones(
-        tx,
-        projectId
-      );
-// ------------------------------------------
-// Milestone Specifications
-// ------------------------------------------
-
-await MilestoneSpecificationService.create(
-  tx,
-  dto,
-  milestones
-);
-
-// ------------------------------------------
-// Dependencies
-// ------------------------------------------
-
-// TODO
-// await MilestoneDependencyService.createBulk(
-//   tx,
-//   dto,
-//   milestones
-// );
-
-// ------------------------------------------
-// Setup Stage
-// ------------------------------------------
-
-await ExecutionRepository.updateSetupStage(
-  tx,
-  projectId,
-  ProjectSetupStage.MILESTONES_CREATED
-);
-
-    // ------------------------------------------
-    // Audit
-    // ------------------------------------------
-
-    await ExecutionAuditRepository.create(
-      tx,
-      {
-        project: {
-          connect: {
-            id: projectId,
-          },
-        },
-
-        actor: {
-          connect: {
-            id: userId,
-          },
-        },
-
-        action:
-          ExecutionAuditAction.MILESTONE_CREATED,
-
-        metadata: {
-          professionals:
-            dto.professionals.length,
-
-          milestones:
-            milestones.length,
-        },
-      }
-    );
-
-    await MilestoneCache.invalidateExecutionPlan(
-  projectId
-);
-
-    return milestones;
-  }
+  return this.createExecutionPlanInternal(
+    tx,
+    projectId,
+    userId,
+    dto
+  );
+}
 
 // ==================================================
 // Get Execution Plan
@@ -280,14 +79,12 @@ static async updateExecutionPlan(
     userId
   );
 
-  // Remove existing plan
   await ExecutionRepository.softDeleteProjectMilestones(
     tx,
     projectId
   );
 
-  // Re-create plan
-  return this.createExecutionPlan(
+  return this.createExecutionPlanInternal(
     tx,
     projectId,
     userId,
@@ -305,19 +102,184 @@ static async deletePlan(
   userId: string
 ): Promise<void> {
   await ExecutionPermissionService.ensureExecutionPlanEditable(
-    projectId,
-    userId
+  projectId,
+  userId
+);
+
+await ExecutionRepository.softDeleteProjectMilestones(
+  tx,
+  projectId
+);
+
+await ExecutionRepository.updateSetupStage(
+  tx,
+  projectId,
+  ProjectSetupStage.PROFESSIONALS_ASSIGNED
+);
+
+await ProjectCache.invalidate(projectId);
+
+await ExecutionAuditRepository.create(tx, {
+  project: {
+    connect: {
+      id: projectId,
+    },
+  },
+
+  actor: {
+    connect: {
+      id: userId,
+    },
+  },
+
+  action:
+    ExecutionAuditAction.MILESTONE_DELETED,
+});
+}
+
+private static async createExecutionPlanInternal(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  userId: string,
+  dto: CreateExecutionPlanDto
+): Promise<Milestone[]> {
+  // ------------------------------------------
+  // Agreement
+  // ------------------------------------------
+
+  const agreement =
+    await ExecutionRepository.findAgreementByProjectId(
+      tx,
+      projectId
+    );
+
+  if (!agreement) {
+    throw new AppError(
+      "Agreement not found.",
+      404,
+      ErrorCode.AGREEMENT_NOT_FOUND
+    );
+  }
+
+  // ------------------------------------------
+  // Validation
+  // ------------------------------------------
+
+  let totalAllocation = 0;
+
+  const participantIds = new Set<string>();
+
+  const validParticipants = new Set(
+    agreement.participants.map(
+      (participant) => participant.id
+    )
   );
 
-  await ExecutionRepository.softDeleteProjectMilestones(
+  const milestonesToCreate: Prisma.MilestoneCreateManyInput[] = [];
+
+  for (const professional of dto.professionals) {
+    if (
+      participantIds.has(
+        professional.agreementParticipantId
+      )
+    ) {
+      throw new AppError(
+        "Duplicate professional found.",
+        400,
+        ErrorCode.INVALID_REQUEST
+      );
+    }
+
+    participantIds.add(
+      professional.agreementParticipantId
+    );
+
+    if (
+      !validParticipants.has(
+        professional.agreementParticipantId
+      )
+    ) {
+      throw new AppError(
+        "Invalid agreement participant.",
+        400,
+        ErrorCode.INVALID_REQUEST
+      );
+    }
+
+    professional.milestones.forEach(
+      (milestone, index) => {
+        ExecutionValidator.validateAllocatedDays(
+          milestone.allocatedDays
+        );
+
+        ExecutionValidator.validatePaymentAllocation(
+          milestone.paymentAllocation
+        );
+
+        ExecutionValidator.validateRevisionLimit(
+          milestone.revisionLimit
+        );
+
+        totalAllocation +=
+          milestone.paymentAllocation;
+
+        milestonesToCreate.push({
+          projectId,
+
+          agreementParticipantId:
+            professional.agreementParticipantId,
+
+          order: index + 1,
+
+          allocatedDays:
+            milestone.allocatedDays,
+
+          paymentAllocation:
+            milestone.paymentAllocation,
+
+          revisionLimit:
+            milestone.revisionLimit,
+
+          createdById: userId,
+
+          updatedById: userId,
+        });
+      }
+    );
+  }
+
+  if (
+    Number(totalAllocation) !==
+    Number(agreement.budget)
+  ) {
+    throw new AppError(
+      "Milestone payment allocation must equal the agreement budget.",
+      400,
+      ErrorCode.INVALID_PAYMENT_ALLOCATION
+    );
+  }
+
+  await ExecutionRepository.createMilestones(
     tx,
-    projectId
+    milestonesToCreate
+  );
+
+  const milestones =
+    await ExecutionRepository.findProjectMilestones(
+      tx,
+      projectId
+    );
+
+  await MilestoneSpecificationService.create(
+    tx,
+    dto,
+    milestones
   );
 
   await ExecutionRepository.updateSetupStage(
     tx,
     projectId,
-    ProjectSetupStage.PROFESSIONALS_ASSIGNED
+    ProjectSetupStage.MILESTONES_CREATED
   );
 
   await ExecutionAuditRepository.create(tx, {
@@ -334,9 +296,24 @@ static async deletePlan(
     },
 
     action:
-      ExecutionAuditAction.MILESTONE_DELETED,
+      ExecutionAuditAction.MILESTONE_CREATED,
+
+    metadata: {
+      professionals:
+        dto.professionals.length,
+
+      milestones:
+        milestones.length,
+    },
   });
+
+  await Promise.all([
+    ProjectCache.invalidate(projectId),
+    MilestoneCache.invalidateExecutionPlan(
+      projectId
+    ),
+  ]);
+
+  return milestones;
 }
-
-
 }

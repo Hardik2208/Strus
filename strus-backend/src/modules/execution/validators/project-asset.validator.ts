@@ -11,7 +11,9 @@ export class ProjectAssetValidator {
   static validateFiles(
     files: Express.Multer.File[]
   ): void {
-    if (!files || files.length === 0) {
+    const uploadedFiles = files ?? [];
+
+    if (uploadedFiles.length === 0) {
       throw new AppError(
         "At least one file is required.",
         400,
@@ -20,7 +22,7 @@ export class ProjectAssetValidator {
     }
 
     if (
-      files.length >
+      uploadedFiles.length >
       ProjectAssetValidator.MAX_FILES
     ) {
       throw new AppError(
@@ -33,7 +35,7 @@ export class ProjectAssetValidator {
     const duplicateNames =
       new Set<string>();
 
-    for (const file of files) {
+    for (const file of uploadedFiles) {
       if (
         duplicateNames.has(
           file.originalname
@@ -57,11 +59,12 @@ export class ProjectAssetValidator {
   // ==================================================
 
   static validateParticipants(
-    participantIds: string[]
+    participantIds?: string[]
   ): void {
-    if (
-      participantIds.length === 0
-    ) {
+    const participants =
+      participantIds ?? [];
+
+    if (participants.length === 0) {
       throw new AppError(
         "Select at least one professional.",
         400,
@@ -72,7 +75,7 @@ export class ProjectAssetValidator {
     const uniqueIds =
       new Set<string>();
 
-    for (const id of participantIds) {
+    for (const id of participants) {
       if (uniqueIds.has(id)) {
         throw new AppError(
           "Duplicate participant selected.",
@@ -83,5 +86,7 @@ export class ProjectAssetValidator {
 
       uniqueIds.add(id);
     }
+
+    
   }
 }

@@ -18,9 +18,6 @@ export class MilestoneMapper {
       allocatedDays:
         milestone.allocatedDays,
 
-      carryForwardDays:
-        milestone.carryForwardDays,
-
       extensionDays:
         milestone.extensionDays,
 

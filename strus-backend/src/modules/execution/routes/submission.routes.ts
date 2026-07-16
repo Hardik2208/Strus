@@ -4,8 +4,10 @@ import { authenticate } from "../../auth/middleware/auth.middleware.js";
 import { MilestoneController } from "../controllers/milestone.controller.js";
 import { MilestoneExtensionController } from "../controllers/milestone-extension.controller.js";
 import { ProjectAssetController } from "../controllers/project-asset.controller.js";
+import { SubmissionController } from "../controllers/submission.controller.js";
 import { uploadProjectAssets } from "../middleware/project-asset-upload.middleware.js";
-import { ExecutionAuditController } from "../controllers/execution-audit.controller.js";
+import { uploadSubmissionAttachments } from "../middleware/submission-upload.middleware.js";
+import { SubmissionReviewController } from "../controllers/submission-review.controller.js";
 
 const router = Router();
 
@@ -47,6 +49,7 @@ router.post(
   authenticate,
   MilestoneExtensionController.create
 );
+
 // ==================================================
 // Project Assets
 // ==================================================
@@ -84,13 +87,48 @@ router.delete(
 );
 
 // ==================================================
-// Execution Audit
+// Milestone Submissions
 // ==================================================
 
-router.get(
-  "/projects/:projectId/audits",
+router.post(
+  "/milestones/:milestoneId/submissions",
   authenticate,
-  ExecutionAuditController.getByProject
+  uploadSubmissionAttachments,
+  SubmissionController.create
+);
+
+router.get(
+  "/milestones/:milestoneId/submissions",
+  authenticate,
+  SubmissionController.list
+);
+
+router.get(
+  "/submissions/:submissionId",
+  authenticate,
+  SubmissionController.get
+);
+
+// ==================================================
+// Submission Review
+// ==================================================
+
+router.patch(
+  "/submissions/:submissionId/approve",
+  authenticate,
+  SubmissionReviewController.approve
+);
+
+router.patch(
+  "/submissions/:submissionId/request-revision",
+  authenticate,
+  SubmissionReviewController.requestRevision
+);
+
+router.get(
+  "/workspaces/:workspaceId/pending-reviews",
+  authenticate,
+  SubmissionReviewController.getPendingReviews
 );
 
 export default router;

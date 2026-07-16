@@ -6,7 +6,10 @@ import type {
   Project,
 } from "../../../generated/prisma/client.js";
 
-import { ProjectSetupStage } from "../../../generated/prisma/enums.js";
+import {
+  ProjectSetupStage,
+  MilestoneStatus,
+} from "../../../generated/prisma/enums.js";
 
 export class ExecutionRepository {
   // ==================================================
@@ -54,18 +57,7 @@ export class ExecutionRepository {
     });
   }
 
-  // ==================================================
-  // Dependencies
-  // ==================================================
 
-  static createDependencies(
-    tx: Prisma.TransactionClient,
-    data: Prisma.MilestoneDependencyCreateManyInput[]
-  ) {
-    return tx.milestoneDependency.createMany({
-      data,
-    });
-  }
 
   // ==================================================
   // Project Setup Stage
@@ -166,19 +158,24 @@ static findMilestoneById(
 static incrementExtensionDays(
   tx: Prisma.TransactionClient,
   milestoneId: string,
-  days: number,
-  updatedById: string
+  daysAdded: number,
+  userId: string
 ) {
   return tx.milestone.update({
     where: {
       id: milestoneId,
     },
+
     data: {
       extensionDays: {
-        increment: days,
+        increment: daysAdded,
       },
 
-      updatedById,
+      updatedBy: {
+        connect: {
+          id: userId,
+        },
+      },
     },
   });
 }
@@ -201,6 +198,165 @@ static findAgreementParticipantsByIds(
       agreement: {
         projectId,
       },
+    },
+  });
+}
+
+static updateMilestone(
+  tx: Prisma.TransactionClient,
+  milestoneId: string,
+  data: Prisma.MilestoneUpdateInput
+) {
+  return tx.milestone.update({
+    where: {
+      id: milestoneId,
+    },
+
+    data,
+  });
+}
+
+// ==================================================
+// Next Milestone
+// ==================================================
+
+static findNextMilestone(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  agreementParticipantId: string,
+  order: number
+) {
+  return tx.milestone.findFirst({
+    where: {
+      projectId,
+
+      agreementParticipantId,
+
+      order: order + 1,
+
+      deletedAt: null,
+    },
+  });
+}
+
+static async findFirstMilestones(
+  tx: Prisma.TransactionClient,
+  projectId: string
+) {
+  return tx.milestone.findMany({
+    where: {
+      projectId,
+      order: 1,
+      deletedAt: null,
+    },
+  });
+}
+
+
+static async startFirstMilestones(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  startedAt: Date
+) {
+  return tx.milestone.updateMany({
+    where: {
+      projectId,
+      order: 1,
+      deletedAt: null,
+    },
+    data: {
+      status: MilestoneStatus.IN_PROGRESS,
+      startedAt,
+    },
+  });
+}
+
+// ==================================================
+// Start Next Milestone
+// ==================================================
+
+static async startNextMilestone(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  agreementParticipantId: string,
+  currentOrder: number,
+  startedAt: Date
+) {
+  return tx.milestone.updateMany({
+    where: {
+      projectId,
+      agreementParticipantId,
+      order: currentOrder + 1,
+      status: MilestoneStatus.NOT_STARTED,
+      deletedAt: null,
+    },
+    data: {
+      status: MilestoneStatus.IN_PROGRESS,
+      startedAt,
+    },
+  });
+}
+
+static async isAgreementParticipant(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  userId: string
+): Promise<boolean> {
+  const participant =
+    await tx.agreementParticipant.findFirst({
+      where: {
+        agreement: {
+          projectId,
+        },
+
+        userId,
+
+        invitationStatus: "ACCEPTED",
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  return participant !== null;
+}
+
+static async hasIncompleteMilestones(
+  tx: Prisma.TransactionClient,
+  projectId: string
+): Promise<boolean> {
+  const count = await tx.milestone.count({
+    where: {
+      projectId,
+      deletedAt: null,
+      status: {
+        not: MilestoneStatus.COMPLETED,
+      },
+    },
+  });
+
+  return count > 0;
+}
+
+// ==================================================
+// Agreement Participant By User
+// ==================================================
+
+static findAgreementParticipantByUser(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  userId: string
+) {
+  return tx.agreementParticipant.findFirst({
+    where: {
+      agreement: {
+        projectId,
+      },
+
+      userId,
+
+      invitationStatus: "ACCEPTED",
     },
   });
 }

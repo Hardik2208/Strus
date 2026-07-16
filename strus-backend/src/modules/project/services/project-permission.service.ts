@@ -231,4 +231,23 @@ export class ProjectPermissionService {
     destinationWorkspace,
   };
 }
+
+static async ensureProjectExists(
+  projectId: string
+) {
+  const project =
+    await ProjectRepository.findProjectById(
+      projectId
+    );
+
+  if (!project) {
+    throw new AppError(
+      "Project not found.",
+      404,
+      ErrorCode.PROJECT_NOT_FOUND
+    );
+  }
+
+  return project;
+}
 }

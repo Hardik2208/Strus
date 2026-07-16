@@ -51,28 +51,37 @@ export class ProjectAssetController {
   // ==================================================
 
   static async list(
-    req: AuthenticatedRequest<{
-      projectId: string;
-    }>,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const assets =
-        await ProjectAssetService.getProjectAssets(
-          req.params.projectId,
-          req.user.id
-        );
+  req: AuthenticatedRequest<{
+    projectId: string;
+  }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const assets =
+      await ProjectAssetService.getProjectAssets(
+        req.params.projectId,
+        req.user.id
+      );
 
-      res.status(200).json({
-        success: true,
+    const response = assets.map(asset => ({
+      ...asset,
 
-        data: assets,
-      });
-    } catch (error) {
-      next(error);
-    }
+      files: asset.files.map(file => ({
+        ...file,
+
+        size: Number(file.size),
+      })),
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: response,
+    });
+  } catch (error) {
+    next(error);
   }
+}
 
   // ==================================================
   // Get

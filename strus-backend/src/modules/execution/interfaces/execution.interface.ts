@@ -19,8 +19,6 @@ export interface MilestoneResponse {
 
   allocatedDays: number;
 
-  carryForwardDays: number;
-
   extensionDays: number;
 
   paymentAllocation: number;
