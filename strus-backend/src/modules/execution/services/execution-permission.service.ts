@@ -27,12 +27,6 @@ export class ExecutionPermissionService {
       userId
     );
 
-    console.log({
-  projectId,
-  status: project.status,
-  setupStage: project.setupStage,
-  allowedStages: options.allowedStages,
-});
   if (
     !options.allowedStatuses.includes(
       project.status
