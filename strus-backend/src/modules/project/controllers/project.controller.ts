@@ -48,9 +48,15 @@ export class ProjectController {
             )
         );
 
-      await ProjectCache.invalidateWorkspace(
-  workspaceId
-);
+      await Promise.all([
+  ProjectCache.invalidateWorkspace(
+    workspaceId
+  ),
+
+  ProjectCache.invalidateRelatedDashboards(
+    project.id
+  ),
+]);
 
 const sockets =
   await getIO()
@@ -239,15 +245,17 @@ static async update(
       );
 
     await Promise.all([
-  ProjectCache.invalidate(
-    projectId
-  ),
+  ProjectCache.invalidate(projectId),
 
   ProjectCache.invalidateWorkspace(
     project.workspaceId
   ),
 
   ProjectAuditCache.invalidate(
+    projectId
+  ),
+
+  ProjectCache.invalidateRelatedDashboards(
     projectId
   ),
 ]);
@@ -296,13 +304,17 @@ static async delete(
     projectId
   ),
 
-    ProjectCache.invalidateWorkspace(
-      workspaceId
-    ),
+  ProjectCache.invalidateWorkspace(
+    workspaceId
+  ),
 
-    ProjectAuditCache.invalidate(
-      projectId
-    ),
+  ProjectAuditCache.invalidate(
+    projectId
+  ),
+
+  ProjectCache.invalidateRelatedDashboards(
+    projectId
+  ),
 ]);
 
     res.status(200).json({
@@ -358,6 +370,10 @@ static async updateStatus(
   ),
 
   ProjectAuditCache.invalidate(
+    projectId
+  ),
+
+  ProjectCache.invalidateRelatedDashboards(
     projectId
   ),
 ]);
@@ -421,22 +437,26 @@ static async transfer(
       );
 
     await Promise.all([
-      ProjectCache.invalidate(
-        projectId
-      ),
+  ProjectCache.invalidate(
+    projectId
+  ),
 
-      ProjectCache.invalidateWorkspace(
-        previousWorkspaceId
-      ),
+  ProjectCache.invalidateWorkspace(
+    previousWorkspaceId
+  ),
 
-      ProjectCache.invalidateWorkspace(
-        dto.destinationWorkspaceId
-      ),
+  ProjectCache.invalidateWorkspace(
+    dto.destinationWorkspaceId
+  ),
 
-      ProjectAuditCache.invalidate(
-        projectId
-      ),
-    ]);
+  ProjectAuditCache.invalidate(
+    projectId
+  ),
+
+  ProjectCache.invalidateRelatedDashboards(
+    projectId
+  ),
+]);
 
     res.status(200).json({
       success: true,

@@ -243,24 +243,32 @@ return hydratedSubmission;
     );
 
   await Promise.all([
-    SubmissionCache.invalidate(
-      submission.id,
-      submission.milestone.id
-    ),
+  SubmissionCache.invalidate(
+    submission.id,
+    submission.milestone.id
+  ),
 
-    SubmissionReviewCache.invalidate(
-      submission.id,
-      submission.milestone.project.workspaceId
-    ),
+  SubmissionCache.invalidateRelatedDashboards(
+    submission.id
+  ),
 
-    MilestoneCache.invalidateMilestone(
-      submission.milestone.id
-    ),
+  SubmissionReviewCache.invalidate(
+    submission.id,
+    submission.milestone.project.workspaceId
+  ),
 
-    MilestoneCache.invalidateExecutionPlan(
-      submission.milestone.projectId
-    ),
-  ]);
+  MilestoneCache.invalidateMilestone(
+    submission.milestone.id
+  ),
+
+  MilestoneCache.invalidateExecutionPlan(
+    submission.milestone.projectId
+  ),
+
+  MilestoneCache.invalidateRelatedDashboards(
+    submission.milestone.id
+  ),
+]);
 
   SubmissionReviewSocket.emitSubmissionApproved(
   submission.milestone.project.workspaceId,
@@ -430,24 +438,32 @@ SubmissionReviewSocket.emitPendingReviewUpdated(
   );
 
   await Promise.all([
-    SubmissionCache.invalidate(
-      submission.id,
-      submission.milestone.id
-    ),
+  SubmissionCache.invalidate(
+    submission.id,
+    submission.milestone.id
+  ),
 
-    SubmissionReviewCache.invalidate(
-      submission.id,
-      submission.milestone.project.workspaceId
-    ),
+  SubmissionCache.invalidateRelatedDashboards(
+    submission.id
+  ),
 
-    MilestoneCache.invalidateMilestone(
-      submission.milestone.id
-    ),
+  SubmissionReviewCache.invalidate(
+    submission.id,
+    submission.milestone.project.workspaceId
+  ),
 
-    MilestoneCache.invalidateExecutionPlan(
-      submission.milestone.projectId
-    ),
-  ]);
+  MilestoneCache.invalidateMilestone(
+    submission.milestone.id
+  ),
+
+  MilestoneCache.invalidateExecutionPlan(
+    submission.milestone.projectId
+  ),
+
+  MilestoneCache.invalidateRelatedDashboards(
+    submission.milestone.id
+  ),
+]);
 
   SubmissionReviewSocket.emitRevisionRequested(
     submission.milestone.project.workspaceId,
@@ -637,24 +653,32 @@ if (!hasIncompleteMilestones) {
     );
 
   await Promise.all([
-    SubmissionCache.invalidate(
-      submission.id,
-      submission.milestone.id
-    ),
+  SubmissionCache.invalidate(
+    submission.id,
+    submission.milestone.id
+  ),
 
-    SubmissionReviewCache.invalidate(
-      submission.id,
-      submission.milestone.project.workspaceId
-    ),
+  SubmissionCache.invalidateRelatedDashboards(
+    submission.id
+  ),
 
-    MilestoneCache.invalidateMilestone(
-      submission.milestone.id
-    ),
+  SubmissionReviewCache.invalidate(
+    submission.id,
+    submission.milestone.project.workspaceId
+  ),
 
-    MilestoneCache.invalidateExecutionPlan(
-      submission.milestone.projectId
-    ),
-  ]);
+  MilestoneCache.invalidateMilestone(
+    submission.milestone.id
+  ),
+
+  MilestoneCache.invalidateExecutionPlan(
+    submission.milestone.projectId
+  ),
+
+  MilestoneCache.invalidateRelatedDashboards(
+    submission.milestone.id
+  ),
+]);
 
   SubmissionReviewSocket.emitSubmissionApproved(
     submission.milestone.project.workspaceId,

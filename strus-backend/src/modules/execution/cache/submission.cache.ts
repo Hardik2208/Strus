@@ -1,4 +1,24 @@
 import { redis } from "../../../core/cache/redis.js";
+import { ClientDashboardOverviewCache } from "../../dashboard/client-dashboard-cache/overview.cache.js";
+
+import { ClientDashboardWorkspacesCache } from "../../dashboard/client-dashboard-cache/workspaces.cache.js";
+
+import { ClientDashboardRequiresAttentionCache } from "../../dashboard/client-dashboard-cache/requires-attention.cache.js";
+
+import { ClientDashboardRecentActivityCache } from "../../dashboard/client-dashboard-cache/recent-activity.cache.js";
+
+import { ProfessionalDashboardOverviewCache } from "../../dashboard/professional-dashboard-cache/overview.cache.js";
+
+import { ProfessionalDashboardActiveProjectsCache } from "../../dashboard/professional-dashboard-cache/active-projects.cache.js";
+
+import { ProfessionalDashboardRecentActivityCache } from "../../dashboard/professional-dashboard-cache/recent-activity.cache.js";
+
+import {
+  AgreementParticipantRole
+} from "../../../generated/prisma/client.js";
+
+import { prisma } from "../../../core/database/prisma.js";
+
 
 export class SubmissionCache {
   private static readonly PREFIX =
@@ -125,4 +145,67 @@ export class SubmissionCache {
   ),
 ]);
   }
+
+  static async invalidateRelatedDashboards(
+  submissionId: string
+): Promise<void> {
+  const submission =
+    await prisma.milestoneSubmission.findUnique({
+      where: {
+        id: submissionId,
+      },
+
+      select: {
+        milestone: {
+          select: {
+            project: {
+              select: {
+                agreement: {
+                  select: {
+                    createdById: true,
+
+                    participants: {
+                      where: {
+                        role:
+                          AgreementParticipantRole.PROFESSIONAL,
+                      },
+
+                      select: {
+                        userId: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+  if (!submission?.milestone.project.agreement) {
+    return;
+  }
+
+  const clientUserId =
+    submission.milestone.project.agreement.createdById;
+
+  const professionalUserIds =
+    submission.milestone.project.agreement.participants.map(
+      participant => participant.userId
+    );
+
+  await Promise.all([
+    ClientDashboardOverviewCache.invalidate(clientUserId),
+    ClientDashboardWorkspacesCache.invalidate(clientUserId),
+    ClientDashboardRequiresAttentionCache.invalidate(clientUserId),
+    ClientDashboardRecentActivityCache.invalidate(clientUserId),
+
+    ...professionalUserIds.flatMap(userId => [
+      ProfessionalDashboardOverviewCache.invalidate(userId),
+      ProfessionalDashboardActiveProjectsCache.invalidate(userId),
+      ProfessionalDashboardRecentActivityCache.invalidate(userId),
+    ]),
+  ]);
+}
 }

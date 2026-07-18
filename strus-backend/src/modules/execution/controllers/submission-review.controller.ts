@@ -9,7 +9,6 @@ import type {
   ApproveSubmissionDto,
   RequestRevisionDto,
 } from "../dtos/review-submission.dto.js";
-
 import { SubmissionReviewService } from "../services/submission-review.service.js";
 import { SubmissionMapper } from "../mappers/submission.mapper.js";
 

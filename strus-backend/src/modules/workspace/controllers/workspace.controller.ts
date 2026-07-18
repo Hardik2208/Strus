@@ -56,6 +56,7 @@ export class WorkspaceController {
       );
 
       await WorkspaceCache.invalidate(userId);
+      await WorkspaceCache.invalidateDashboard(userId);
 
       res.status(201).json({
         success: true,

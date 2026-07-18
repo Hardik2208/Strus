@@ -7,6 +7,7 @@ import type { AuthenticatedRequest } from "../../auth/interfaces/auth.interface.
 import { SubmissionMapper } from "../mappers/submission.mapper.js";
 import type { CreateMilestoneSubmissionDto } from "../dtos/create-milestone-submission.dto.js";
 import { SubmissionService } from "../services/submission.service.js";
+import { SubmissionCache } from "../cache/submission.cache.js";
 
 export class SubmissionController {
   // ==================================================
@@ -32,6 +33,14 @@ export class SubmissionController {
           req.body,
           req.files as Express.Multer.File[]
         );
+      await SubmissionCache.invalidate(
+  submission.id,
+  submission.milestoneId
+);
+
+await SubmissionCache.invalidateRelatedDashboards(
+  submission.id
+);
 
       res.status(201).json({
         success: true,

@@ -21,7 +21,7 @@ import { workspaceRoutes } from "./modules/workspace/index.js";
 import { projectRoutes } from "./modules/project/index.js";
 import { agreementRoutes } from "./modules/agreement/index.js";
 import { executionRoutes } from "./modules/execution/index.js"
-
+import { dashboardRoutes } from "./modules/dashboard/index.js";
 const app = express();
 
 app.use(helmetMiddleware);
@@ -45,7 +45,7 @@ app.use("/api/v1/workspaces", workspaceRoutes);
 app.use("/api/v1/project", projectRoutes);
 app.use("/api/v1/agreement", agreementRoutes);
 app.use("/api/v1/execution", executionRoutes);
-
+app.use("/api/v1/dashboard", dashboardRoutes);
 app.use(notFoundMiddleware);
 
 app.use(errorMiddleware);

@@ -1,5 +1,5 @@
 import { redis } from "../../../core/cache/redis.js";
-
+import { ClientDashboardWorkspacesCache } from "../../dashboard/client-dashboard-cache/workspaces.cache.js"
 import type { WorkspaceResponse } from "../interfaces/workspace-response.interface.js";
 
 export class WorkspaceCache {
@@ -83,6 +83,14 @@ static async invalidateWorkspace(
 ): Promise<void> {
   await redis.del(
     this.workspaceKey(workspaceId)
+  );
+}
+
+static async invalidateDashboard(
+  userId: string
+): Promise<void> {
+  await ClientDashboardWorkspacesCache.invalidate(
+    userId
   );
 }
 }

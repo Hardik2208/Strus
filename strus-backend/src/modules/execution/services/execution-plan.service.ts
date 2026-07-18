@@ -119,6 +119,7 @@ await ExecutionRepository.updateSetupStage(
 
 await ProjectCache.invalidate(projectId);
 
+
 await ExecutionAuditRepository.create(tx, {
   project: {
     connect: {

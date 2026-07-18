@@ -1,6 +1,23 @@
 import { redis } from "../../../core/cache/redis.js";
-
+import { prisma } from "../../../core/database/prisma.js";
 import type { Milestone } from "../../../generated/prisma/client.js";
+import { ClientDashboardOverviewCache } from "../../dashboard/client-dashboard-cache/overview.cache.js";
+
+import { ClientDashboardWorkspacesCache } from "../../dashboard/client-dashboard-cache/workspaces.cache.js";
+
+import { ClientDashboardRequiresAttentionCache } from "../../dashboard/client-dashboard-cache/requires-attention.cache.js";
+
+import { ClientDashboardRecentActivityCache } from "../../dashboard/client-dashboard-cache/recent-activity.cache.js";
+
+import { ProfessionalDashboardOverviewCache } from "../../dashboard/professional-dashboard-cache/overview.cache.js";
+
+import { ProfessionalDashboardActiveProjectsCache } from "../../dashboard/professional-dashboard-cache/active-projects.cache.js";
+
+import { ProfessionalDashboardRecentActivityCache } from "../../dashboard/professional-dashboard-cache/recent-activity.cache.js";
+
+import {
+  AgreementParticipantRole
+} from "../../../generated/prisma/client.js";
 
 export class MilestoneCache {
   private static readonly TTL = 60 * 10;
@@ -89,4 +106,63 @@ export class MilestoneCache {
       this.byMilestoneKey(milestoneId)
     );
   }
+
+  static async invalidateRelatedDashboards(
+  milestoneId: string
+): Promise<void> {
+  const milestone = await prisma.milestone.findUnique({
+    where: {
+      id: milestoneId,
+    },
+
+    select: {
+      project: {
+        select: {
+          agreement: {
+            select: {
+              createdById: true,
+
+              participants: {
+                where: {
+                  role: AgreementParticipantRole.PROFESSIONAL,
+                },
+
+                select: {
+                  userId: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!milestone?.project.agreement) {
+    return;
+  }
+
+  const clientUserId =
+    milestone.project.agreement.createdById;
+
+  const professionalUserIds =
+    milestone.project.agreement.participants.map(
+      participant => participant.userId
+    );
+
+  await Promise.all([
+    ClientDashboardOverviewCache.invalidate(clientUserId),
+    ClientDashboardWorkspacesCache.invalidate(clientUserId),
+    ClientDashboardRequiresAttentionCache.invalidate(clientUserId),
+    ClientDashboardRecentActivityCache.invalidate(clientUserId),
+
+    ...professionalUserIds.flatMap(userId => [
+      ProfessionalDashboardOverviewCache.invalidate(userId),
+      ProfessionalDashboardActiveProjectsCache.invalidate(userId),
+      ProfessionalDashboardRecentActivityCache.invalidate(userId),
+    ]),
+  ]);
+}
+
+
 }
