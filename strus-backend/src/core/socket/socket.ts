@@ -5,8 +5,10 @@ import { Server } from "socket.io";
 import { logger } from "../logger/index.js";
 
 import { WorkspaceRepository } from "../../modules/workspace/repositories/workspace.repository.js";
+import { ConversationRepository } from "../../modules/communication/repositories/conversation.repository.js";
 
 import { authenticateSocket } from "./socket-auth.js";
+import { SocketEvents } from "./socket-events.js";
 
 let io: Server;
 
@@ -28,9 +30,17 @@ export function initializeSocket(
         socket.data.user.id;
 
       try {
+        // ==========================================
+        // Personal Room
+        // ==========================================
+
         socket.join(
           `user:${userId}`
         );
+
+        // ==========================================
+        // Workspace Rooms
+        // ==========================================
 
         const workspaces =
           await WorkspaceRepository.findWorkspaceIds(
@@ -66,6 +76,88 @@ export function initializeSocket(
 
         return;
       }
+
+      // ==========================================
+      // Join Conversation
+      // ==========================================
+
+      socket.on(
+        SocketEvents.CONVERSATION_JOINED,
+        async (
+          conversationId: string
+        ) => {
+          try {
+            const conversation =
+              await ConversationRepository.findAccessibleConversation(
+                conversationId,
+                userId
+              );
+
+            if (!conversation) {
+              logger.warn(
+                {
+                  userId,
+                  conversationId,
+                },
+                "Unauthorized conversation join."
+              );
+
+              return;
+            }
+
+            socket.join(
+              `conversation:${conversationId}`
+            );
+
+            logger.info(
+              {
+                socketId: socket.id,
+                userId,
+                conversationId,
+              },
+              "Conversation joined."
+            );
+          } catch (error) {
+            logger.error(
+              {
+                error,
+                socketId: socket.id,
+                userId,
+                conversationId,
+              },
+              "Failed to join conversation."
+            );
+          }
+        }
+      );
+
+      // ==========================================
+      // Leave Conversation
+      // ==========================================
+
+      socket.on(
+        SocketEvents.CONVERSATION_LEFT,
+        (
+          conversationId: string
+        ) => {
+          socket.leave(
+            `conversation:${conversationId}`
+          );
+
+          logger.info(
+            {
+              socketId: socket.id,
+              userId,
+              conversationId,
+            },
+            "Conversation left."
+          );
+        }
+      );
+
+      // ==========================================
+      // Disconnect
+      // ==========================================
 
       socket.on(
         "disconnect",

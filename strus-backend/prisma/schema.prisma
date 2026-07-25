@@ -190,6 +190,36 @@ enum SubmissionTiming {
   LATE
 }
 
+enum ConversationType {
+  WORKSPACE
+  PROJECT
+}
+
+enum ConversationStatus {
+  ACTIVE
+  READ_ONLY
+}
+
+enum MessageType {
+  USER
+  SYSTEM
+}
+
+enum MessageStatus {
+  ACTIVE
+  EDITED
+  DELETED
+}
+
+enum MessageAttachmentType {
+  DOCUMENT
+  IMAGE
+  VIDEO
+  AUDIO
+  ARCHIVE
+  OTHER
+}
+
 //
 // ======================================================
 // AUTHENTICATION
@@ -278,6 +308,10 @@ model User {
   reviewedMilestoneSubmissions MilestoneSubmission[] @relation("MilestoneSubmissionReviewedBy")
 
   revisionRequests RevisionRequest[] @relation("RevisionRequestedBy")
+
+  conversationParticipants ConversationParticipant[]
+  sentMessages             Message[]
+  editedMessages           MessageEditHistory[]
 
   @@index([status])
   @@index([verificationLevel])
@@ -490,6 +524,8 @@ model Workspace {
 
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  conversation Conversation?
+
   auditLogs WorkspaceAuditLog[]
   projects  Project[]
 
@@ -595,6 +631,7 @@ model Project {
   executionAudits          ExecutionAudit[]
   projectAssets            ProjectAsset[]
   projectAssetVisibilities ProjectAssetVisibility[]
+  conversation             Conversation?
 
   @@index([workspaceId])
   @@index([createdById])
@@ -1056,4 +1093,165 @@ model RevisionRequest {
   @@index([milestoneId, revisionNumber])
   @@index([milestoneId])
   @@index([requestedById])
+}
+
+model Conversation {
+  id String @id @default(uuid()) @db.Uuid
+
+  type   ConversationType
+  status ConversationStatus @default(ACTIVE)
+
+  workspaceId String?    @unique @db.Uuid
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  projectId String?  @unique @db.Uuid
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lastMessageId  String?   @db.Uuid
+  lastActivityAt DateTime?
+
+  nextMessageSequence Int @default(1)
+
+  lastMessage Message? @relation("ConversationLastMessage", fields: [lastMessageId], references: [id])
+
+  messages Message[] @relation("ConversationMessages")
+
+  participants ConversationParticipant[]
+
+  @@index([type])
+  @@index([status])
+}
+
+model ConversationParticipant {
+  id String @id @default(uuid()) @db.Uuid
+
+  conversationId String       @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime @default(now())
+
+  lastReadSequence Int?
+
+  lastReadAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([conversationId, userId])
+  @@index([conversationId])
+  @@index([userId])
+  @@index([conversationId, lastReadSequence])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id String @id @default(uuid()) @db.Uuid
+
+  conversationId String @map("conversation_id") @db.Uuid
+
+  senderId String @map("sender_id") @db.Uuid
+
+  // ==================================================
+  // Reply
+  // ==================================================
+
+  replyToId String? @map("reply_to_id") @db.Uuid
+
+  replyTo Message? @relation("MessageReplies",fields: [replyToId],references: [id],onDelete: SetNull )
+
+  replies Message[] @relation("MessageReplies")
+
+  sequence Int
+
+  type MessageType @default(USER)
+
+  status MessageStatus @default(ACTIVE)
+
+  content String @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  deletedAt DateTime? @map("deleted_at")
+
+  conversation Conversation @relation( "ConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade )
+
+  sender User @relation( fields: [senderId], references: [id], onDelete: Restrict )
+
+  lastMessageFor Conversation[] @relation("ConversationLastMessage")
+
+  attachments MessageAttachment[]
+
+  editHistory MessageEditHistory[]
+
+  @@unique([conversationId, sequence])
+
+  @@index([conversationId, sequence(sort: Desc)])
+
+  @@index([conversationId])
+
+  @@index([senderId])
+
+  @@index([replyToId])
+
+  @@index([status])
+
+  @@index([deletedAt])
+
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id String @id @default(uuid()) @db.Uuid
+
+  messageId String @map("message_id") @db.Uuid
+
+  publicId String @map("public_id") @db.VarChar(255)
+
+  url String @db.Text
+
+  originalName String @map("original_name") @db.VarChar(255)
+
+  mimeType String @map("mime_type") @db.VarChar(100)
+
+  extension String @db.VarChar(20)
+
+  attachmentType MessageAttachmentType @map("attachment_type")
+
+  size BigInt
+
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([attachmentType])
+  @@map("message_attachments")
+}
+
+model MessageEditHistory {
+  id String @id @default(uuid()) @db.Uuid
+
+  messageId String @map("message_id") @db.Uuid
+
+  editedById String @map("edited_by_id") @db.Uuid
+
+  previousContent String @map("previous_content") @db.Text
+
+  editedAt DateTime @default(now()) @map("edited_at")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  editedBy User @relation(fields: [editedById], references: [id], onDelete: Restrict)
+
+  @@index([messageId])
+  @@index([editedById])
+  @@map("message_edit_history")
 }

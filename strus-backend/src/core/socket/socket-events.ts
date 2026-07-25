@@ -64,4 +64,26 @@ SUBMISSION_REVISION_REQUESTED:
 PENDING_REVIEWS_UPDATED:
   "execution:pending-reviews:updated",
 
+// ==================================================
+// Communication
+// ==================================================
+
+MESSAGE_SENT:
+  "communication:message:sent",
+
+MESSAGE_UPDATED:
+  "communication:message:updated",
+
+MESSAGE_DELETED:
+  "communication:message:deleted",
+
+MESSAGE_READ:
+  "communication:message:read",
+
+CONVERSATION_JOINED:
+  "communication:conversation:joined",
+
+CONVERSATION_LEFT:
+  "communication:conversation:left",
+
 } as const;

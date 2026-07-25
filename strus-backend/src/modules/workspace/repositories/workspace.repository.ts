@@ -8,7 +8,6 @@ import type {
   CreateWorkspaceInput,
   CreateWorkspaceMemberInput,
 } from "../types/create-workspace.types.js";
-import { WorkspaceType } from "../../../generated/prisma/enums.js";
 
 import { prisma } from "../../../core/database/prisma.js";
 
@@ -88,7 +87,15 @@ static async findById(
 ): Promise<
   Prisma.WorkspaceMemberGetPayload<{
     include: {
-      workspace: true;
+      workspace: {
+        include: {
+          conversation: {
+            select: {
+              id: true;
+            };
+          };
+        };
+      };
     };
   }> | null
 > {
@@ -101,7 +108,15 @@ static async findById(
     },
 
     include: {
-      workspace: true,
+      workspace: {
+        include: {
+          conversation: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
     },
   });
 }
@@ -309,16 +324,22 @@ static async findWorkspaceInvitations(
   };
 }
 
-static async findInvitationById(
-  invitationId: string
-) {
+static async findInvitationById(invitationId: string) {
   return prisma.workspaceInvitation.findUnique({
     where: {
       id: invitationId,
     },
-
     include: {
       invitedUser: true,
+      workspace: {
+        include: {
+          conversation: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
     },
   });
 }

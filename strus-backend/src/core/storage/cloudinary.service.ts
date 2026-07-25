@@ -21,6 +21,8 @@ export interface UploadFileResponse {
   bytes: number;
 
   format: string;
+
+  resourceType: string;
 }
 
 export class CloudinaryService {
@@ -37,7 +39,7 @@ export class CloudinaryService {
 
               public_id: options.publicId,
 
-              overwrite: true,
+              overwrite: false,
 
               resource_type:
                 options.resourceType ??
@@ -52,12 +54,13 @@ export class CloudinaryService {
               resolve({
                 url: result.secure_url,
 
-                publicId:
-                  result.public_id,
+  publicId: result.public_id,
 
-                bytes: result.bytes,
+  bytes: result.bytes,
 
-                format: result.format,
+  format: result.format,
+
+  resourceType: result.resource_type,
               });
             }
           );

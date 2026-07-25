@@ -1,0 +1,17 @@
+export const COMMUNICATION_CONSTANTS = {
+  CACHE: {
+    CONVERSATION_TTL: 60 * 60,
+    PARTICIPANTS_TTL: 60 * 30,
+  },
+
+  LIMITS: {
+    MAX_MESSAGE_LENGTH: 5000,
+    MAX_ATTACHMENTS: 5,
+    MAX_ATTACHMENT_SIZE: 10 * 1024 * 1024, // 10 MB
+  },
+
+  PAGINATION: {
+    DEFAULT_LIMIT: 20,
+    MAX_LIMIT: 100,
+  },
+} as const;

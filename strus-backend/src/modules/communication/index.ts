@@ -1,0 +1,1 @@
+export { default as communicationRoutes } from "./routes/index.js";

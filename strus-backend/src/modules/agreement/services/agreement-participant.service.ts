@@ -20,6 +20,7 @@ import { AgreementAuditCache } from "../cache/agreement-audit.cache.js";
 import { AgreementParticipantRepository } from "../repositories/agreement-participant.repository.js"
 import type { InviteProfessionalDto } from "../dtos/invite-professional.dto.js";
 import type { UpdateInvitationStatusDto } from "../dtos/update-invitation-status.dto.js";
+import { ProjectConversationService } from "../../communication/services/project-conversation.service.js"
 
 export class AgreementParticipantService {
   // ==================================================
@@ -403,24 +404,28 @@ export class AgreementParticipantService {
   // ==================================================
 
   if (accepted) {
-    const acceptedCount =
-      await AgreementParticipantRepository.countAcceptedProfessionals(
-        agreement.id
-      );
+  const acceptedCount =
+    await AgreementParticipantRepository.countAcceptedProfessionals(
+      agreement.id
+    );
 
-    if (
-      acceptedCount > 0 &&
-      agreement.project
-        .setupStage ===
-        ProjectSetupStage.AGREEMENT_COMPLETED
-    ) {
-      await ProjectRepository.updateSetupStage(
-        tx,
-        agreement.projectId,
-        ProjectSetupStage.PROFESSIONALS_ASSIGNED
-      );
-    }
+  if (
+    acceptedCount > 0 &&
+    agreement.project.setupStage ===
+      ProjectSetupStage.AGREEMENT_COMPLETED
+  ) {
+    await ProjectRepository.updateSetupStage(
+      tx,
+      agreement.projectId,
+      ProjectSetupStage.PROFESSIONALS_ASSIGNED
+    );
   }
+
+  await ProjectConversationService.syncParticipants(
+    tx,
+    agreement.id
+  );
+}
 
   // ==================================================
   // Cache
@@ -536,6 +541,11 @@ return participantWithAgreement;
     tx,
     participant.id
   );
+
+  await ProjectConversationService.syncParticipants(
+    tx,
+    agreement.id
+);
 
   // ==================================================
   // Audit

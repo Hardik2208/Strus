@@ -22,6 +22,8 @@ import { projectRoutes } from "./modules/project/index.js";
 import { agreementRoutes } from "./modules/agreement/index.js";
 import { executionRoutes } from "./modules/execution/index.js"
 import { dashboardRoutes } from "./modules/dashboard/index.js";
+import { communicationRoutes } from "./modules/communication/index.js";
+
 const app = express();
 
 app.use(helmetMiddleware);
@@ -46,6 +48,8 @@ app.use("/api/v1/project", projectRoutes);
 app.use("/api/v1/agreement", agreementRoutes);
 app.use("/api/v1/execution", executionRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/communication", communicationRoutes);
+
 app.use(notFoundMiddleware);
 
 app.use(errorMiddleware);

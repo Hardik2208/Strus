@@ -7,8 +7,6 @@ import { WorkspaceRepository } from "../repositories/workspace.repository.js";
 import { WorkspaceSlugUtil } from "../utils/workspace-slug.util.js";
 import { WorkspaceMapper } from "../mappers/workspace.mapper.js";
 import type { CreatePersonalWorkspaceInput } from "../types/create-workspace.types.js";
-import { WorkspaceMemberMapper } from "../mappers/workspace-member.mapper.js";
-import type { MemberResponse } from "../interfaces/member-response.interface.js";
 import crypto from "node:crypto";
 import type { CreateWorkspaceDto } from "../dtos/create-workspace.dto.js";
 import type { UpdateWorkspaceDto } from "../dtos/update-workspace.dto.js";
@@ -16,7 +14,6 @@ import { WorkspaceValidator } from "../validators/workspace.validator.js";
 import { AppError } from "../../../core/errors/AppError.js";
 import { ErrorCode } from "../../../core/errors/ErrorCodes.js";
 import type { WorkspaceResponse } from "../interfaces/workspace-response.interface.js";
-import { profileRepository } from "../../users/repositories/profile.repository.js";
 import type { MemberListResponse } from "../interfaces/member-list-response.interface.js";
 import type { MemberSearchQueryDto } from "../dtos/member-search-query.dto.js";
 import { WorkspaceInvitationStatus,WorkspaceRole,WorkspaceType } from "../../../generated/prisma/enums.js";
@@ -31,6 +28,8 @@ import type { WorkspaceAuditListResponse } from "../interfaces/workspace-audit-l
 import { WorkspaceAuditMapper } from "../mappers/workspace-audit.mapper.js";
 import { WorkspaceAuditRepository } from "../repositories/workspace-audit.repository.js";
 import { AuditAction } from "../../../generated/prisma/enums.js";
+import { ConversationService } from "../../communication/services/conversation.service.js";
+import { ConversationParticipantRepository } from "../../communication/repositories/conversation-participant.repository.js";
 
 export class WorkspaceService {
 
@@ -60,7 +59,14 @@ export class WorkspaceService {
       userId: input.userId,
       role: WorkspaceRole.OWNER,
     });
+
+    await ConversationService.initializeWorkspaceConversation(
+  tx,
+  workspace.id,
+  [input.userId]
+);
   }
+
 
   static async createTeamWorkspace(
   tx: Prisma.TransactionClient,
@@ -102,6 +108,12 @@ export class WorkspaceService {
     userId: ownerId,
     role: WorkspaceRole.OWNER,
   });
+
+  await ConversationService.initializeWorkspaceConversation(
+  tx,
+  workspace.id,
+  [ownerId]
+);
 
   return workspace;
 }
@@ -764,21 +776,54 @@ static async acceptInvitation(
     );
   }
 
+  // ------------------------------------------
+  // Create Workspace Member
+  // ------------------------------------------
+
   await WorkspaceRepository.createWorkspaceMember(
     tx,
     {
-      workspaceId:
-        invitation.workspaceId,
+      workspaceId: invitation.workspaceId,
       userId,
       role: WorkspaceRole.MEMBER,
     }
   );
+
+  // ------------------------------------------
+  // Mark Invitation Accepted
+  // ------------------------------------------
 
   await WorkspaceRepository.updateInvitationStatus(
     tx,
     invitation.id,
     WorkspaceInvitationStatus.ACCEPTED
   );
+
+  // ------------------------------------------
+  // Add User to Workspace Conversation
+  // ------------------------------------------
+
+  const membership =
+    await WorkspaceRepository.findById(
+      invitation.workspaceId,
+      userId
+    );
+
+  if (invitation.workspace?.conversation?.id) {
+    await ConversationParticipantRepository.createMany(
+      tx,
+      [
+        {
+          conversationId: invitation.workspace.conversation.id,
+          userId,
+        },
+      ]
+    );
+  }
+
+  // ------------------------------------------
+  // Audit Logs
+  // ------------------------------------------
 
   await WorkspaceAuditRepository.create(tx, {
     workspaceId: invitation.workspaceId,
@@ -795,8 +840,7 @@ static async acceptInvitation(
   });
 
   return {
-    workspaceId:
-      invitation.workspaceId,
+    workspaceId: invitation.workspaceId,
   };
 }
 
@@ -1037,6 +1081,14 @@ static async removeMember(
     workspaceId,
     memberId
   );
+
+  if (requester.workspace.conversation) {
+  await ConversationParticipantRepository.deleteMany(
+    tx,
+    requester.workspace.conversation.id,
+    [memberId]
+  );
+}
 }
 
 static async leaveWorkspace(
@@ -1092,6 +1144,13 @@ static async leaveWorkspace(
     workspaceId,
     userId
   );
+if (membership.workspace.conversation) {
+  await ConversationParticipantRepository.deleteMany(
+    tx,
+    membership.workspace.conversation.id,
+    [userId]
+  );
+}
 }
 
 static async transferOwnership(

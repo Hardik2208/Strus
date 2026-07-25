@@ -13,6 +13,8 @@ import { ProjectPermissionService } from "./project-permission.service.js";
 import { ProjectAuditCache } from "../cache/project-audit.cache.js";
 import { AgreementService } from "../../agreement/services/agreement.service.js";
 import { ExecutionService } from "../../execution/services/execution.service.js";
+import { ProjectConversationService } from "../../communication/services/project-conversation.service.js"
+import { AgreementRepository } from "../../agreement/repositories/agreement.repository.js";
 
 export class ProjectService {
   // ==================================================
@@ -376,12 +378,54 @@ break;
       projectId,
       status
     );
-
-  if (status === ProjectStatus.ACTIVE) {
+  
+  switch (status) {
+  case ProjectStatus.ACTIVE:
   await ExecutionService.startExecution(
     tx,
     projectId
   );
+
+  const agreement =
+    await AgreementRepository.findByProjectId(
+      projectId
+    );
+
+  if (!agreement) {
+    throw new AppError(
+      "Agreement not found.",
+      404,
+      ErrorCode.AGREEMENT_NOT_FOUND
+    );
+  }
+
+  await ProjectConversationService.activate(
+    tx,
+    projectId
+  );
+
+
+  await ProjectConversationService.syncParticipants(
+    tx,
+    agreement.id
+  );
+
+  break;
+  case ProjectStatus.COMPLETED:
+    await ProjectConversationService.complete(
+      tx,
+      projectId
+    );
+
+    break;
+
+  case ProjectStatus.MUTUALLY_TERMINATED:
+    await ProjectConversationService.complete(
+      tx,
+      projectId
+    );
+
+    break;
 }
 
   await ProjectAuditRepository.create(tx, {

@@ -205,4 +205,31 @@ export class AgreementParticipantRepository {
       },
     });
   }
+
+
+
+static async findForConversationSync(
+  agreementId: string
+) {
+  return prisma.agreement.findUnique({
+    where: {
+      id: agreementId,
+    },
+    include: {
+      project: {
+        select: {
+          id: true,
+          status: true,
+        },
+      },
+      participants: {
+        select: {
+          userId: true,
+          role: true,
+          invitationStatus: true,
+        },
+      },
+    },
+  });
+}
 }
