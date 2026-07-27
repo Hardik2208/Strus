@@ -398,9 +398,6 @@ static async updateStatus(
 // Transfer Project
 // ==================================================
 
-// ==================================================
-// Transfer Project
-// ==================================================
 
 static async transfer(
   req: AuthenticatedRequest<
