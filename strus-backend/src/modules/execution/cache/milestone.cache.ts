@@ -7,13 +7,9 @@ import { ClientDashboardWorkspacesCache } from "../../dashboard/client-dashboard
 
 import { ClientDashboardRequiresAttentionCache } from "../../dashboard/client-dashboard-cache/requires-attention.cache.js";
 
-import { ClientDashboardRecentActivityCache } from "../../dashboard/client-dashboard-cache/recent-activity.cache.js";
-
 import { ProfessionalDashboardOverviewCache } from "../../dashboard/professional-dashboard-cache/overview.cache.js";
 
 import { ProfessionalDashboardActiveProjectsCache } from "../../dashboard/professional-dashboard-cache/active-projects.cache.js";
-
-import { ProfessionalDashboardRecentActivityCache } from "../../dashboard/professional-dashboard-cache/recent-activity.cache.js";
 
 import {
   AgreementParticipantRole
@@ -154,12 +150,10 @@ export class MilestoneCache {
     ClientDashboardOverviewCache.invalidate(clientUserId),
     ClientDashboardWorkspacesCache.invalidate(clientUserId),
     ClientDashboardRequiresAttentionCache.invalidate(clientUserId),
-    ClientDashboardRecentActivityCache.invalidate(clientUserId),
 
     ...professionalUserIds.flatMap(userId => [
       ProfessionalDashboardOverviewCache.invalidate(userId),
       ProfessionalDashboardActiveProjectsCache.invalidate(userId),
-      ProfessionalDashboardRecentActivityCache.invalidate(userId),
     ]),
   ]);
 }

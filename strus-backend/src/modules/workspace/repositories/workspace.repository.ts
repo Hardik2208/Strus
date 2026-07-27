@@ -685,4 +685,55 @@ static async findWorkspaceById(
     },
   });
 }
+
+static async findWorkspaceForDeletion(
+  workspaceId: string,
+  userId: string
+): Promise<
+  Prisma.WorkspaceMemberGetPayload<{
+    include: {
+      workspace: {
+        include: {
+          conversation: {
+            select: {
+              id: true;
+            };
+          };
+          members: {
+            select: {
+              userId: true;
+            };
+          };
+        };
+      };
+    };
+  }> | null
+> {
+  return prisma.workspaceMember.findUnique({
+    where: {
+      workspaceId_userId: {
+        workspaceId,
+        userId,
+      },
+    },
+
+    include: {
+      workspace: {
+        include: {
+          conversation: {
+            select: {
+              id: true,
+            },
+          },
+
+          members: {
+            select: {
+              userId: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
 }

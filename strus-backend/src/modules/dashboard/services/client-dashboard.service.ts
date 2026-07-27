@@ -3,7 +3,6 @@ import { ProjectStatus } from "../../../generated/prisma/client.js";
 import { ClientDashboardOverviewCache } from "../client-dashboard-cache/overview.cache.js";
 import { ClientDashboardWorkspacesCache } from "../client-dashboard-cache/workspaces.cache.js";
 import { ClientDashboardRequiresAttentionCache } from "../client-dashboard-cache/requires-attention.cache.js";
-import { ClientDashboardRecentActivityCache } from "../client-dashboard-cache/recent-activity.cache.js";
 
 import { ClientDashboardRepository } from "../repositories/client-dashboard.repository.js";
 
@@ -233,38 +232,5 @@ export class ClientDashboardService {
 );
 
     return attention;
-  }
-
-  // ==================================================
-  // Recent Activity
-  // ==================================================
-
-  static async getRecentActivity(
-    userId: string,
-    activityLimit: number
-  ) {
-    const cachedActivity =
-  await ClientDashboardRecentActivityCache.get(
-    userId,
-    activityLimit
-  );
-
-    if (cachedActivity) {
-      return cachedActivity;
-    }
-
-    const activity =
-      await ClientDashboardRepository.getRecentActivity(
-        userId,
-        activityLimit
-      );
-
-    await ClientDashboardRecentActivityCache.set(
-  userId,
-  activity,
-  activityLimit
-);
-
-    return activity;
   }
 }

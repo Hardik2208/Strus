@@ -29,6 +29,7 @@ import {
 import { getIO } from "../../../core/socket/socket.js";
 import type { RemoveMemberParamDto } from "../dtos/remove-member-param.dto.js";
 import { SocketEvents } from "../../../core/socket/socket-events.js";
+import { WorkspacePublisher } from "../../event/publishers/workspace.publisher.js";
 
 export class WorkspaceController {
   // ==================================================
@@ -54,6 +55,18 @@ export class WorkspaceController {
           );
         }
       );
+
+      await WorkspacePublisher.publishWorkspaceCreated({
+        workspaceId: workspace.id,
+        workspaceName: workspace.name,
+        workspaceType: workspace.workspaceType,
+        ownerId: workspace.ownerId,
+        createdById: userId,
+
+        recipientIds: [
+          workspace.ownerId,
+        ],
+      });
 
       await WorkspaceCache.invalidate(userId);
       await WorkspaceCache.invalidateDashboard(userId);
@@ -211,16 +224,31 @@ static async delete(
 
     const { workspaceId } = req.params;
 
-    await prisma.$transaction(async (tx) => {
-      await WorkspaceService.deleteWorkspace(
-        tx,
-        workspaceId,
-        userId
-      );
+    const deletedWorkspace =
+      await prisma.$transaction(async (tx) => {
+        return WorkspaceService.deleteWorkspace(
+          tx,
+          workspaceId,
+          userId
+        );
+      });
+
+    await WorkspacePublisher.publishWorkspaceDeleted({
+      workspaceId:
+        deletedWorkspace.workspaceId,
+
+      workspaceName:
+        deletedWorkspace.workspaceName,
+
+      createdById: userId,
+
+      recipientIds:
+        deletedWorkspace.recipientIds,
     });
 
     await Promise.all([
       WorkspaceCache.invalidate(userId),
+
       WorkspaceCache.invalidateWorkspace(
         workspaceId
       ),
@@ -684,6 +712,13 @@ static async transferOwnership(
           dto.newOwnerId
         )
     );
+
+    await WorkspacePublisher.publishWorkspaceOwnershipTransferred({
+      workspaceId,
+      previousOwnerId: ownerId,
+      newOwnerId: dto.newOwnerId,
+      createdById: ownerId,
+    });
 
     getIO()
       .to(`workspace:${workspaceId}`)

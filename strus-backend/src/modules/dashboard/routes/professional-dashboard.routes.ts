@@ -23,12 +23,6 @@ router.get(
 );
 
 router.get(
-  "/recent-activity",
-  authenticate,
-  ProfessionalDashboardController.getRecentActivity
-);
-
-router.get(
   "/quick-actions",
   authenticate,
   ProfessionalDashboardController.getQuickActions

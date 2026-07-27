@@ -65,38 +65,6 @@ export class ProfessionalDashboardController {
   }
 
   // ==================================================
-  // Recent Activity
-  // ==================================================
-
-  static async getRecentActivity(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const userId =
-        req.user.id;
-
-      const activityLimit =
-        Number(req.query.activityLimit ?? 10);
-
-      const activity =
-        await ProfessionalDashboardService.getRecentActivity(
-          userId,
-          activityLimit
-        );
-
-      res.status(200).json({
-        success: true,
-
-        data: activity,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  // ==================================================
   // Quick Actions
   // ==================================================
 

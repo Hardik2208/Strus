@@ -23,6 +23,7 @@ import { agreementRoutes } from "./modules/agreement/index.js";
 import { executionRoutes } from "./modules/execution/index.js"
 import { dashboardRoutes } from "./modules/dashboard/index.js";
 import { communicationRoutes } from "./modules/communication/index.js";
+import { notificationRoutes } from "./modules/event/index.js";
 
 const app = express();
 
@@ -49,6 +50,7 @@ app.use("/api/v1/agreement", agreementRoutes);
 app.use("/api/v1/execution", executionRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
 app.use("/api/v1/communication", communicationRoutes);
+app.use("/api/v1/notification", notificationRoutes);
 
 app.use(notFoundMiddleware);
 

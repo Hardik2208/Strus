@@ -22,10 +22,5 @@ router.get(
   ClientDashboardController.getRequiresAttention
 );
 
-router.get(
-  "/client-dashboard/recent-activity",
-  authenticate,
-  ClientDashboardController.getRecentActivity
-);
 
 export default router;

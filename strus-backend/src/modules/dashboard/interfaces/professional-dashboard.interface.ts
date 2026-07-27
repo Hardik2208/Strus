@@ -30,24 +30,6 @@ export interface ActiveProjectSummary {
   status: string;
 }
 
-export interface ProfessionalDashboardActivity {
-  id: string;
-
-  source: "PROJECT" | "AGREEMENT";
-
-  action: string;
-
-  title: string;
-
-  description: string;
-
-  projectId: string;
-
-  projectTitle: string;
-
-  createdAt: Date;
-}
-
 export interface ProfessionalQuickAction {
   key: string;
 
@@ -60,8 +42,6 @@ export interface ProfessionalDashboardResponse {
   overview: ProfessionalDashboardOverview;
 
   activeProjects: ActiveProjectSummary[];
-
-  recentActivity: ProfessionalDashboardActivity[];
 
   quickActions: ProfessionalQuickAction[];
 }

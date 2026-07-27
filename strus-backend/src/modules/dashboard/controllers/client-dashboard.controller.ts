@@ -4,9 +4,6 @@ import type {
 } from "express";
 
 import type { AuthenticatedRequest } from "../../auth/interfaces/auth.interface.js";
-
-import type { GetClientDashboardDto } from "../dtos/get-client-dashboard.dto.js";
-
 import { ClientDashboardService } from "../services/client-dashboard.service.js";
 
 export class ClientDashboardController {
@@ -93,34 +90,4 @@ export class ClientDashboardController {
       next(error);
     }
   }
-
-  // ==================================================
-  // Recent Activity
-  // ==================================================
-
-  static async getRecentActivity(
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  try {
-    const userId = req.user.id;
-
-    const activityLimit =
-      Number(req.query.activityLimit ?? 10);
-
-    const activity =
-      await ClientDashboardService.getRecentActivity(
-        userId,
-        activityLimit
-      );
-
-    res.status(200).json({
-      success: true,
-      data: activity,
-    });
-  } catch (error) {
-    next(error);
-  }
-}
 }

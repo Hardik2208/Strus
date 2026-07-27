@@ -6,13 +6,10 @@ import { ClientDashboardWorkspacesCache } from "../../dashboard/client-dashboard
 
 import { ClientDashboardRequiresAttentionCache } from "../../dashboard/client-dashboard-cache/requires-attention.cache.js";
 
-import { ClientDashboardRecentActivityCache } from "../../dashboard/client-dashboard-cache/recent-activity.cache.js";
-
 import { ProfessionalDashboardOverviewCache } from "../../dashboard/professional-dashboard-cache/overview.cache.js";
 
 import { ProfessionalDashboardActiveProjectsCache } from "../../dashboard/professional-dashboard-cache/active-projects.cache.js";
 
-import { ProfessionalDashboardRecentActivityCache } from "../../dashboard/professional-dashboard-cache/recent-activity.cache.js";
 const TTL = 60 * 10; // 10 minutes
 
 export class ProjectCache {
@@ -169,9 +166,6 @@ export class ProjectCache {
     clientUserId
   ),
 
-  ClientDashboardRecentActivityCache.invalidate(
-    clientUserId
-  ),
 
   // Professional Dashboard
   ...professionalUserIds.flatMap(
@@ -181,10 +175,6 @@ export class ProjectCache {
       ),
 
       ProfessionalDashboardActiveProjectsCache.invalidate(
-        userId
-      ),
-
-      ProfessionalDashboardRecentActivityCache.invalidate(
         userId
       ),
     ]

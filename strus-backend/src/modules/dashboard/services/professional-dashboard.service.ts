@@ -2,15 +2,12 @@ import type {
   ProfessionalDashboardOverview,
   ActiveProjectSummary,
   ProfessionalQuickAction,
-  ProfessionalDashboardActivity,
 } from "../interfaces/professional-dashboard.interface.js";
 
 import { ProfessionalDashboardRepository } from "../repositories/professional-dashboard.repository.js";
 import { ProfessionalDashboardOverviewCache } from "../professional-dashboard-cache/overview.cache.js";
 
 import { ProfessionalDashboardActiveProjectsCache } from "../professional-dashboard-cache/active-projects.cache.js";
-
-import { ProfessionalDashboardRecentActivityCache } from "../professional-dashboard-cache/recent-activity.cache.js";
 
 export class ProfessionalDashboardService {
   // ==================================================
@@ -147,41 +144,6 @@ export class ProfessionalDashboardService {
 }
 
   // ==================================================
-  // Recent Activity
-  // ==================================================
-
-  static async getRecentActivity(
-  userId: string,
-  activityLimit: number
-): Promise<
-  ProfessionalDashboardActivity[]
-> {
-  const cached =
-  await ProfessionalDashboardRecentActivityCache.get<ProfessionalDashboardActivity[]>(
-    userId,
-    activityLimit
-  );
-
-  if (cached) {
-    return cached;
-  }
-
-  const activity =
-    await ProfessionalDashboardRepository.getRecentActivity(
-      userId,
-      activityLimit
-    );
-
-  await ProfessionalDashboardRecentActivityCache.set(
-  userId,
-  activity,
-  activityLimit
-);
-
-  return activity;
-}
-
-  // ==================================================
   // Quick Actions
   // ==================================================
 
@@ -218,17 +180,6 @@ export class ProfessionalDashboardService {
 
         route:
           "/dashboard/professional/projects",
-      },
-
-      {
-        key:
-          "RECENT_ACTIVITY",
-
-        label:
-          "View Recent Activity",
-
-        route:
-          "/dashboard/professional/activity",
       },
     ];
   }

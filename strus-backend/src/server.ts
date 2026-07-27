@@ -8,14 +8,19 @@ import { env } from "./core/config/env.js";
 import { connectRedis } from "./core/cache/redis.js";
 import { logger } from "./core/logger/index.js";
 
+import { initializeQueues } from "./core/queues/index.js";
+
 import { ExecutionScheduler } from "./modules/execution/jobs/execution.scheduler.js";
 
 async function bootstrap() {
   try {
+    // Connect Redis
     await connectRedis();
 
-    const httpServer =
-      createServer(app);
+    // Initialize BullMQ queues & workers
+    initializeQueues();
+
+    const httpServer = createServer(app);
 
     initializeSocket(httpServer);
 

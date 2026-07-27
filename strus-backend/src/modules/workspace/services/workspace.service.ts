@@ -259,9 +259,13 @@ static async deleteWorkspace(
   tx: Prisma.TransactionClient,
   workspaceId: string,
   userId: string
-): Promise<void> {
+): Promise<{
+  workspaceId: string;
+  workspaceName: string;
+  recipientIds: string[];
+}> {
   const membership =
-    await WorkspaceRepository.findById(
+    await WorkspaceRepository.findWorkspaceForDeletion(
       workspaceId,
       userId
     );
@@ -295,18 +299,28 @@ static async deleteWorkspace(
     );
   }
 
-  // Future:
-  // Check active projects before deletion.
+  const recipientIds =
+    membership.workspace.members.map(
+      (member) => member.userId
+    );
+
   await WorkspaceAuditRepository.create(tx, {
-  workspaceId,
-  actorId: userId,
-  action: AuditAction.WORKSPACE_DELETED,
-});
+    workspaceId,
+    actorId: userId,
+    action: AuditAction.WORKSPACE_DELETED,
+  });
 
   await WorkspaceRepository.deleteWorkspace(
     tx,
     workspaceId
   );
+
+  return {
+    workspaceId,
+    workspaceName:
+      membership.workspace.name,
+    recipientIds,
+  };
 }
 
 static async getWorkspaceMembers(
