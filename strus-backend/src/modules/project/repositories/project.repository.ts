@@ -305,4 +305,39 @@ static async findProjectByIdTx(
     },
   });
 }
+
+static async findProjectForDeletion(
+  projectId: string
+) {
+  return prisma.project.findFirst({
+    where: {
+      id: projectId,
+      deletedAt: null,
+    },
+
+    include: {
+      workspace: {
+        include: {
+          members: {
+            select: {
+              userId: true,
+              role: true,
+            },
+          },
+        },
+      },
+
+      agreement: {
+        include: {
+          participants: {
+            select: {
+              userId: true,
+              invitationStatus: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
 }

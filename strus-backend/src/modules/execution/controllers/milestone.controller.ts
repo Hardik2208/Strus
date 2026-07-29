@@ -6,7 +6,7 @@ import type {
 import { prisma } from "../../../core/database/prisma.js";
 import { MilestoneCache } from "../cache/milestone.cache.js";
 import type { AuthenticatedRequest } from "../../auth/interfaces/auth.interface.js";
-
+import { ExecutionPublisher } from "../../event/publishers/execution.publisher.js";
 import type { CreateExecutionPlanDto } from "../dtos/create-execution-plan.dto.js";
 
 import { MilestoneService } from "../services/execution-plan.service.js";
@@ -44,6 +44,14 @@ export class MilestoneController {
               dto
             )
         );
+
+      await ExecutionPublisher.publishExecutionPlanCreated({
+
+  createdById: userId,
+
+  projectId,
+
+});
       
         await MilestoneCache.invalidateExecutionPlan(
     projectId
@@ -56,14 +64,6 @@ await Promise.all(
         )
     )
 );
-
-const firstMilestone = milestones.at(0);
-
-if (firstMilestone) {
-  await MilestoneCache.invalidateRelatedDashboards(
-    firstMilestone.id
-  );
-}
 
       res.status(201).json({
         success: true,
@@ -156,6 +156,14 @@ if (firstMilestone) {
             )
         );
 
+      await ExecutionPublisher.publishExecutionPlanUpdated({
+
+  createdById: userId,
+
+  projectId,
+
+});
+
       await MilestoneCache.invalidateExecutionPlan(
     projectId
 );
@@ -167,15 +175,6 @@ await Promise.all(
         )
     )
 );
-
-const firstMilestone = milestones.at(0);
-
-if (firstMilestone) {
-  await MilestoneCache.invalidateRelatedDashboards(
-    firstMilestone.id
-  );
-
-}
 
       res.status(200).json({
         success: true,

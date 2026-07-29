@@ -428,4 +428,80 @@ static async getWorkspaceOwnershipTransferredContext(
   };
 
 }
+
+/**
+ * Resolve all information required to create
+ * Workspace Member Left notifications.
+ */
+static async getWorkspaceMemberLeftContext(
+  workspaceId: string,
+  leftUserId: string
+) {
+
+  const workspace =
+    await prisma.workspace.findUnique({
+
+      where: {
+        id: workspaceId,
+      },
+
+      select: {
+
+        id: true,
+
+        name: true,
+
+      },
+
+    });
+
+  if (!workspace) {
+    return null;
+  }
+
+  const leftUser =
+    await prisma.user.findUnique({
+
+      where: {
+        id: leftUserId,
+      },
+
+      select: {
+
+        id: true,
+
+        profile: {
+
+          select: {
+
+            firstName: true,
+
+            lastName: true,
+
+          },
+
+        },
+
+      },
+
+    });
+
+  if (!leftUser) {
+    return null;
+  }
+
+  return {
+
+    workspaceId: workspace.id,
+
+    workspaceName: workspace.name,
+
+    leftUserId,
+
+    leftUserName:
+      `${leftUser.profile?.firstName ?? ""} ${leftUser.profile?.lastName ?? ""}`.trim(),
+
+  };
+
+}
 }

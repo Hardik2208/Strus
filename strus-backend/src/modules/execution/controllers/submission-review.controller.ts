@@ -11,6 +11,7 @@ import type {
 } from "../dtos/review-submission.dto.js";
 import { SubmissionReviewService } from "../services/submission-review.service.js";
 import { SubmissionMapper } from "../mappers/submission.mapper.js";
+import { ExecutionPublisher } from "../../event/publishers/execution.publisher.js";
 
 export class SubmissionReviewController {
   // ==================================================
@@ -18,54 +19,88 @@ export class SubmissionReviewController {
   // ==================================================
 
   static async approve(
-    req: AuthenticatedRequest<
-      { submissionId: string },
-      unknown,
-      ApproveSubmissionDto
-    >,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { submissionId } =
-        req.params;
+  req: AuthenticatedRequest<
+    { submissionId: string },
+    unknown,
+    ApproveSubmissionDto
+  >,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { submissionId } =
+      req.params;
 
-      const userId =
-        req.user.id;
+    const userId =
+      req.user.id;
 
-      const dto =
-        req.body as ApproveSubmissionDto;
+    const dto =
+      req.body as ApproveSubmissionDto;
 
-      const submission =
-        await SubmissionReviewService.approve(
-          submissionId,
-          userId,
-          dto
-        );
+    const result =
+      await SubmissionReviewService.approve(
+        submissionId,
+        userId,
+        dto
+      );
 
-      res.status(200).json({
-        success: true,
+    await ExecutionPublisher.publishMilestoneCompleted({
 
-        message:
-          "Submission approved successfully.",
+      createdById: userId,
 
-        data:
-          SubmissionMapper.toResponse(
-            submission
-          ),
+      projectId:
+        result.completedMilestone.projectId,
+
+      milestoneId:
+        result.completedMilestone.id,
+
+      agreementParticipantId:
+        result.completedMilestone
+          .agreementParticipantId,
+
+    });
+
+    if (result.startedMilestone) {
+
+      await ExecutionPublisher.publishMilestoneStarted({
+
+        createdById: userId,
+
+        projectId:
+          result.startedMilestone.projectId,
+
+        milestoneId:
+          result.startedMilestone.id,
+
+        agreementParticipantId:
+          result.startedMilestone
+            .agreementParticipantId,
+
       });
-    } catch (error) {
-      next(error);
+
     }
+
+    res.status(200).json({
+      success: true,
+
+      message:
+        "Submission approved successfully.",
+
+      data:
+        SubmissionMapper.toResponse(
+          result.submission
+        ),
+    });
+
+  } catch (error) {
+    next(error);
   }
+}
 
   // ==================================================
   // Request Revision
   // ==================================================
 
-  // ==================================================
-// Request Revision
-// ==================================================
 
 static async requestRevision(
   req: AuthenticatedRequest<
@@ -92,6 +127,21 @@ static async requestRevision(
         userId,
         dto
       );
+
+    await ExecutionPublisher.publishRevisionRequested({
+
+  createdById: userId,
+
+  projectId: revision.milestone.projectId,
+
+  milestoneId: revision.milestoneId,
+
+  revisionRequestId: revision.id,
+
+  agreementParticipantId:
+  revision.milestone.agreementParticipantId,
+
+});
 
     res.status(200).json({
       success: true,

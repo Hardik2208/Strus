@@ -17,6 +17,9 @@ import type {
   WorkspaceOwnershipTransferredJobData,
 } from "../types/notification.types.js";
 import { JOB_NAMES } from "../../../core/queues/queue.constants.js";
+import type {
+  WorkspaceMemberLeftJobData,
+} from "../types/notification.types.js";
 
 export class WorkspacePublisher {
   /**
@@ -104,6 +107,27 @@ static async publishWorkspaceOwnershipTransferred(
 
   const job: NotificationJob = {
     type: NotificationJobType.WORKSPACE_OWNERSHIP_TRANSFERRED,
+    payload,
+  };
+
+  await eventQueue.add(
+    JOB_NAMES.CREATE_EVENT,
+    job,
+    options
+  );
+
+}
+
+/**
+ * Publish Workspace Member Left notification.
+ */
+static async publishWorkspaceMemberLeft(
+  payload: WorkspaceMemberLeftJobData,
+  options?: JobsOptions
+): Promise<void> {
+
+  const job: NotificationJob = {
+    type: NotificationJobType.WORKSPACE_MEMBER_LEFT,
     payload,
   };
 

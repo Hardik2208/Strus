@@ -106,7 +106,7 @@ export class SubmissionReviewService {
     dto
   );
 
-  const reviewedSubmission =
+  const result =
     await prisma.$transaction(
       async (tx) => {
         const reviewedSubmission =
@@ -160,38 +160,40 @@ if (!hasIncompleteMilestones) {
   );
 }
 
-        const nextMilestone =
-          await ExecutionRepository.findNextMilestone(
-            tx,
-            submission.milestone.projectId,
-            submission.milestone
-              .agreementParticipantId,
-            submission.milestone.order
-          );
+        let startedMilestone = null;
 
-        if (
-          nextMilestone &&
-          nextMilestone.status ===
-            MilestoneStatus.NOT_STARTED
-        ) {
-          await ExecutionRepository.updateMilestone(
-            tx,
-            nextMilestone.id,
-            {
-              status:
-                MilestoneStatus.IN_PROGRESS,
+const nextMilestone =
+  await ExecutionRepository.findNextMilestone(
+    tx,
+    submission.milestone.projectId,
+    submission.milestone.agreementParticipantId,
+    submission.milestone.order
+  );
 
-              startedAt:
-                new Date(),
+if (
+  nextMilestone &&
+  nextMilestone.status ===
+    MilestoneStatus.NOT_STARTED
+) {
+  startedMilestone =
+    await ExecutionRepository.updateMilestone(
+      tx,
+      nextMilestone.id,
+      {
+        status:
+          MilestoneStatus.IN_PROGRESS,
 
-              updatedBy: {
-                connect: {
-                  id: userId,
-                },
-              },
-            }
-          );
-        }
+        startedAt:
+          new Date(),
+
+        updatedBy: {
+          connect: {
+            id: userId,
+          },
+        },
+      }
+    );
+}
 
         await ExecutionAuditRepository.create(
           tx,
@@ -238,7 +240,16 @@ if (!hydratedSubmission) {
   );
 }
 
-return hydratedSubmission;
+return {
+
+  submission: hydratedSubmission,
+
+  completedMilestone:
+    submission.milestone,
+
+  startedMilestone,
+
+};
       }
     );
 
@@ -246,10 +257,6 @@ return hydratedSubmission;
   SubmissionCache.invalidate(
     submission.id,
     submission.milestone.id
-  ),
-
-  SubmissionCache.invalidateRelatedDashboards(
-    submission.id
   ),
 
   SubmissionReviewCache.invalidate(
@@ -264,10 +271,6 @@ return hydratedSubmission;
   MilestoneCache.invalidateExecutionPlan(
     submission.milestone.projectId
   ),
-
-  MilestoneCache.invalidateRelatedDashboards(
-    submission.milestone.id
-  ),
 ]);
 
   SubmissionReviewSocket.emitSubmissionApproved(
@@ -280,7 +283,7 @@ SubmissionReviewSocket.emitPendingReviewUpdated(
   submission.milestone.project.workspaceId
 );
 
-  return reviewedSubmission;
+  return result;
 }
 
     // ==================================================
@@ -443,10 +446,6 @@ SubmissionReviewSocket.emitPendingReviewUpdated(
     submission.milestone.id
   ),
 
-  SubmissionCache.invalidateRelatedDashboards(
-    submission.id
-  ),
-
   SubmissionReviewCache.invalidate(
     submission.id,
     submission.milestone.project.workspaceId
@@ -458,10 +457,6 @@ SubmissionReviewSocket.emitPendingReviewUpdated(
 
   MilestoneCache.invalidateExecutionPlan(
     submission.milestone.projectId
-  ),
-
-  MilestoneCache.invalidateRelatedDashboards(
-    submission.milestone.id
   ),
 ]);
 
@@ -658,10 +653,6 @@ if (!hasIncompleteMilestones) {
     submission.milestone.id
   ),
 
-  SubmissionCache.invalidateRelatedDashboards(
-    submission.id
-  ),
-
   SubmissionReviewCache.invalidate(
     submission.id,
     submission.milestone.project.workspaceId
@@ -673,10 +664,6 @@ if (!hasIncompleteMilestones) {
 
   MilestoneCache.invalidateExecutionPlan(
     submission.milestone.projectId
-  ),
-
-  MilestoneCache.invalidateRelatedDashboards(
-    submission.milestone.id
   ),
 ]);
 

@@ -8,6 +8,7 @@ import { SubmissionMapper } from "../mappers/submission.mapper.js";
 import type { CreateMilestoneSubmissionDto } from "../dtos/create-milestone-submission.dto.js";
 import { SubmissionService } from "../services/submission.service.js";
 import { SubmissionCache } from "../cache/submission.cache.js";
+import { ExecutionPublisher } from "../../event/publishers/execution.publisher.js";
 
 export class SubmissionController {
   // ==================================================
@@ -15,45 +16,57 @@ export class SubmissionController {
   // ==================================================
 
   static async create(
-    req: AuthenticatedRequest<
-      {
-        milestoneId: string;
-      },
-      unknown,
-      CreateMilestoneSubmissionDto
-    >,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const submission =
-        await SubmissionService.create(
-          req.params.milestoneId,
-          req.user.id,
-          req.body,
-          req.files as Express.Multer.File[]
-        );
-      await SubmissionCache.invalidate(
-  submission.id,
-  submission.milestoneId
-);
+  req: AuthenticatedRequest<
+    {
+      milestoneId: string;
+    },
+    unknown,
+    CreateMilestoneSubmissionDto
+  >,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const result =
+      await SubmissionService.create(
+        req.params.milestoneId,
+        req.user.id,
+        req.body,
+        req.files as Express.Multer.File[]
+      );
 
-await SubmissionCache.invalidateRelatedDashboards(
-  submission.id
-);
+    await ExecutionPublisher.publishSubmissionCreated({
 
-      res.status(201).json({
-        success: true,
+      createdById: req.user.id,
 
-        message:
-          "Submission submitted successfully.",
+      projectId:
+        result.projectId,
 
-        data: submission,
-      });
-    } catch (error) {
-      next(error);
-    }
+      milestoneId:
+        result.submission.milestoneId,
+
+      submissionId:
+        result.submission.id,
+
+      agreementParticipantId:
+        result.agreementParticipantId,
+
+    });
+
+    res.status(201).json({
+      success: true,
+
+      message:
+        "Submission submitted successfully.",
+
+      data:
+        result.submission,
+    });
+
+  } catch (error) {
+    next(error);
   }
+}
 
   // ==================================================
   // Get

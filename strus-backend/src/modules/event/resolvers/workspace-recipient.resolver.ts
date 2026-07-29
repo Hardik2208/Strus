@@ -47,4 +47,14 @@ export class WorkspaceRecipientResolver {
     newOwnerId
   );
 }
+
+static async resolveWorkspaceMemberLeft(
+  workspaceId: string,
+  leftUserId: string
+) {
+  return EventHelperRepository.getWorkspaceMemberLeftContext(
+    workspaceId,
+    leftUserId
+  );
+}
 }

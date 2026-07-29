@@ -6,9 +6,8 @@ import type {
 import { prisma } from "../../../core/database/prisma.js";
 
 import type { AuthenticatedRequest } from "../../auth/interfaces/auth.interface.js";
-
+import { ExecutionPublisher } from "../../event/publishers/execution.publisher.js";
 import type { CreateMilestoneExtensionDto } from "../dtos/create-milestone-extension.dto.js";
-
 import { MilestoneExtensionService } from "../services/milestone-extension.service.js";
 
 export class MilestoneExtensionController {
@@ -30,24 +29,42 @@ export class MilestoneExtensionController {
 
       const userId = req.user.id;
 
-      const extension =
-        await prisma.$transaction((tx) =>
-          MilestoneExtensionService.create(
-            tx,
-            projectId,
-            userId,
-            req.body
-          )
-        );
+      const result =
+  await prisma.$transaction((tx) =>
+    MilestoneExtensionService.create(
+      tx,
+      projectId,
+      userId,
+      req.body
+    )
+  );
+
+      await ExecutionPublisher.publishExtensionGranted({
+
+  createdById: userId,
+
+  projectId,
+
+  milestoneId:
+    result.extension.milestoneId,
+
+  extensionId:
+    result.extension.id,
+
+  agreementParticipantId:
+    result.agreementParticipantId,
+
+});
 
       res.status(201).json({
-        success: true,
+  success: true,
 
-        message:
-          "Milestone extension granted successfully.",
+  message:
+    "Milestone extension granted successfully.",
 
-        data: extension,
-      });
+  data:
+    result.extension,
+});
     } catch (error) {
       next(error);
     }

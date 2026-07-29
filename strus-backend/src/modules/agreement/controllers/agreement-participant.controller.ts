@@ -1,7 +1,7 @@
 import type { Response } from "express";
 
 import { prisma } from "../../../core/database/prisma.js";
-
+import { AgreementPublisher } from "../../event/publishers/agreement.publisher.js";
 import { AgreementParticipantService } from "../services/agreement-participant.service.js";
 import { AgreementParticipantMapper } from "../mappers/agreement-participant.mapper.js";
 import { AgreementInvitationStatus } from "../../../generated/prisma/enums.js";
@@ -84,6 +84,13 @@ export class AgreementParticipantController {
     }
   );
 
+  await AgreementPublisher.publishProfessionalInvited({
+  createdById: req.user.id,
+  projectId,
+  agreementId: participant.agreementId,
+  participantId: participant.id,
+});
+
     return res.status(201).json({
       success: true,
       message:
@@ -156,6 +163,13 @@ export class AgreementParticipantController {
           participant.respondedAt,
       }
     );
+
+    await AgreementPublisher.publishInvitationAccepted({
+  createdById: req.user.id,
+  projectId,
+  agreementId: participant.agreementId,
+  participantId: participant.id,
+});
 }
 
 if (
@@ -177,6 +191,13 @@ if (
           participant.respondedAt,
       }
     );
+
+    await AgreementPublisher.publishInvitationDeclined({
+  createdById: req.user.id,
+  projectId,
+  agreementId: participant.agreementId,
+  participantId: participant.id,
+});
 }
 
     return res.status(200).json({
@@ -214,6 +235,13 @@ if (
         req.user.id
       )
   );
+
+  await AgreementPublisher.publishProfessionalRemoved({
+  createdById: req.user.id,
+  projectId,
+  agreementId: participant.agreementId,
+  participantId: participant.id,
+});
 
   const sockets =
   await getIO()
@@ -274,6 +302,13 @@ static async withdrawInvitation(
           req.user.id
         )
     );
+
+  await AgreementPublisher.publishInvitationWithdrawn({
+  createdById: req.user.id,
+  projectId,
+  agreementId: participant.agreementId,
+  participantId: participant.id,
+});
 
   getIO()
     .to(`user:${participant.userId}`)

@@ -133,6 +133,13 @@ export class MilestoneExtensionService {
       dto.milestoneId
     );
 
-    return extension;
+    return {
+
+  extension,
+
+  agreementParticipantId:
+    milestone.agreementParticipantId,
+
+};
   }
 }

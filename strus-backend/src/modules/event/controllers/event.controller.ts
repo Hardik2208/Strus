@@ -19,6 +19,7 @@ import {
   GetProfessionalDashboardActivitiesSchema,
 } from "../dtos/get-professional-dashboard-activities.dto.js";
 
+
 export class EventController {
   // ==================================================
   // Client Dashboard Activities

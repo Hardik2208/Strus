@@ -221,33 +221,62 @@ enum MessageAttachmentType {
 }
 
 enum EventType {
+  // ======================================================
   // Workspace
+  // ======================================================
+
   WORKSPACE_CREATED
   WORKSPACE_DELETED
 
   WORKSPACE_MEMBER_JOINED
   WORKSPACE_MEMBER_REMOVED
   WORKSPACE_OWNERSHIP_TRANSFERRED
+  WORKSPACE_MEMBER_LEFT
 
+  // ======================================================
   // Agreement
+  // ======================================================
 
   AGREEMENT_SENT
   AGREEMENT_SIGNED
   AGREEMENT_REJECTED
 
+  // ======================================================
   // Project
+  // ======================================================
 
+  PROJECT_CREATED
+  PROJECT_UPDATED
   PROJECT_ACTIVATED
   PROJECT_COMPLETED
+  PROJECT_DELETED
+  PROJECT_WORKSPACE_TRANSFERRED
   PROJECT_CANCELLED
 
-  // Execution
+  // ======================================================
+  // Agreement
+  // ======================================================
 
+  AGREEMENT_CREATED
+  AGREEMENT_UPDATED
+  AGREEMENT_PROFESSIONAL_INVITED
+  AGREEMENT_INVITATION_ACCEPTED
+  AGREEMENT_INVITATION_DECLINED
+  AGREEMENT_INVITATION_WITHDRAWN
+  AGREEMENT_PROFESSIONAL_REMOVED
+
+  // ======================================================
+  // Execution
+  // ======================================================
+
+  EXECUTION_PLAN_CREATED
+  EXECUTION_PLAN_UPDATED
   MILESTONE_STARTED
   SUBMISSION_UNDER_REVIEW
   REVISION_REQUESTED
   EXTENSION_GRANTED
   MILESTONE_COMPLETED
+  PROJECT_ASSET_SHARED
 }
 
 enum EventResourceType {

@@ -238,7 +238,11 @@ export class SubmissionService {
   userId: string,
   dto: CreateMilestoneSubmissionDto,
   files: Express.Multer.File[]
-): Promise<MilestoneSubmission> {
+): Promise<{
+  submission: MilestoneSubmission;
+  projectId: string;
+  agreementParticipantId: string;
+}> {
   const milestone =
     await SubmissionRepository.findMilestone(
       milestoneId
@@ -487,7 +491,17 @@ const timing =
           milestone.projectId
         );
 
-        return submission;
+        return {
+
+  submission,
+
+  projectId:
+    milestone.projectId,
+
+  agreementParticipantId:
+    milestone.agreementParticipantId,
+
+};
       }
     );
   } catch (error) {

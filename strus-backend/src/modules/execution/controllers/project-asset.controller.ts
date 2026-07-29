@@ -6,7 +6,7 @@ import type {
 import type { AuthenticatedRequest } from "../../auth/interfaces/auth.interface.js";
 
 import type { CreateProjectAssetDto } from "../dtos/create-project-asset.dto.js";
-
+import { ExecutionPublisher } from "../../event/publishers/execution.publisher.js";
 import { ProjectAssetService } from "../services/project-asset.service.js";
 
 export class ProjectAssetController {
@@ -32,6 +32,16 @@ export class ProjectAssetController {
           (req.files ??
             []) as Express.Multer.File[]
         );
+
+      await ExecutionPublisher.publishProjectAssetShared({
+
+  createdById: req.user.id,
+
+  projectId: req.params.projectId,
+
+  projectAssetId: asset.id,
+
+});
 
       res.status(201).json({
         success: true,

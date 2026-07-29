@@ -7,7 +7,7 @@ import { AgreementMapper } from "../mappers/agreement.mapper.js";
 import { getIO } from "../../../core/socket/socket.js";
 import { SocketEvents } from "../../../core/socket/socket-events.js";
 import type { AuthenticatedRequest } from "../../auth/interfaces/auth.interface.js";
-
+import { AgreementPublisher } from "../../event/publishers/agreement.publisher.js";
 import type { CreateAgreementDto } from "../dtos/create-agreement.dto.js";
 import type { UpdateAgreementDto } from "../dtos/update-agreement.dto.js";
 
@@ -33,6 +33,13 @@ export class AgreementController {
           dto
         )
     );
+
+    await AgreementPublisher.publishAgreementCreated({
+  createdById: req.user.id,
+  projectId,
+  agreementId: agreement.id,
+});
+
 
 
     return res.status(201).json({
@@ -85,6 +92,12 @@ export class AgreementController {
           dto
         )
     );
+
+    await AgreementPublisher.publishAgreementUpdated({
+  createdById: req.user.id,
+  projectId,
+  agreementId: agreement.id,
+});
 
     return res.status(200).json({
       success: true,

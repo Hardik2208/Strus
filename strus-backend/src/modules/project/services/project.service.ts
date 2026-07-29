@@ -2,7 +2,7 @@ import type { Prisma,Project } from "../../../generated/prisma/client.js";
 import { ProjectAuditAction,ProjectStatus } from "../../../generated/prisma/enums.js";
 import { AppError } from "../../../core/errors/AppError.js";
 import { ErrorCode } from "../../../core/errors/ErrorCodes.js";
-import { ProjectSetupStage } from "../../../generated/prisma/enums.js";
+import { ProjectSetupStage, WorkspaceRole, AgreementInvitationStatus } from "../../../generated/prisma/enums.js";
 import { ProjectRepository } from "../repositories/project.repository.js";
 import { ProjectAuditRepository } from "../repositories/project-audit.repository.js";
 import type { ListProjectsDto } from "../dtos/list-projects.dto.js";
@@ -248,35 +248,85 @@ static async updateSetupStage(
   // ==================================================
 
   static async delete(
-    tx: Prisma.TransactionClient,
-    projectId: string,
-    userId: string
-  ): Promise<string> {
-    const project =
-      await ProjectPermissionService.ensureProjectDeletable(
-        projectId,
-        userId
-      );
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  userId: string
+): Promise<{
+  projectId: string;
+  projectTitle: string;
+  workspaceId: string;
+  clientRecipientIds: string[];
+  professionalRecipientIds: string[];
+}> {
 
-    await ProjectAuditRepository.create(tx, {
-      projectId,
+  // Permission validation
+  await ProjectPermissionService.ensureProjectDeletable(
+    projectId,
+    userId
+  );
 
-      actorId: userId,
-
-      action: ProjectAuditAction.DELETED,
-    });
-
-    await ProjectAuditCache.invalidate(
+  // Load deletion snapshot
+  const project =
+    await ProjectRepository.findProjectForDeletion(
       projectId
     );
 
-    await ProjectRepository.softDelete(
-      tx,
-      projectId
+  if (!project) {
+    throw new AppError(
+      "Project not found.",
+      404,
+      ErrorCode.PROJECT_NOT_FOUND
     );
-
-    return project.workspaceId;
   }
+
+  const clientRecipientIds = [
+    ...new Set(
+      project.workspace.members
+        .filter(
+          (member) =>
+            member.role === WorkspaceRole.OWNER ||
+            member.role === WorkspaceRole.ADMIN
+        )
+        .map((member) => member.userId)
+    ),
+  ];
+
+  const professionalRecipientIds = [
+    ...new Set(
+      (project.agreement?.participants ?? [])
+        .filter(
+          (participant) =>
+            participant.invitationStatus ===
+            AgreementInvitationStatus.ACCEPTED
+        )
+        .map((participant) => participant.userId)
+    ),
+  ];
+
+  await ProjectAuditRepository.create(tx, {
+    projectId,
+    actorId: userId,
+    action: ProjectAuditAction.DELETED,
+  });
+
+  await ProjectAuditCache.invalidate(
+    projectId
+  );
+
+  await ProjectRepository.softDelete(
+    tx,
+    projectId
+  );
+
+  return {
+    projectId: project.id,
+    projectTitle: project.title,
+    workspaceId: project.workspaceId,
+    clientRecipientIds,
+    professionalRecipientIds,
+  };
+
+}
 
   // ==================================================
   // Update Project Status
@@ -448,10 +498,6 @@ break;
 
   return updatedProject;
 }
-
-  // ==================================================
-// Transfer Project
-// ==================================================
 
 // ==================================================
 // Transfer Project

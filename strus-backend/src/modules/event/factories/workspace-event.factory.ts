@@ -12,6 +12,7 @@ import type { WorkspaceCreatedJobData } from "../types/notification.types.js";
 import type {
   WorkspaceDeletedJobData,
   WorkspaceOwnershipTransferredJobData,
+  WorkspaceMemberLeftJobData,
 } from "../types/notification.types.js";
 import type {
   WorkspaceMemberRemovedJobData,
@@ -101,48 +102,6 @@ static async workspaceMemberJoined(
     }
 
     //
-    // Notify workspace owner/admins
-    //
-
-    const adminRecipients =
-      context.recipientIds.filter(
-        id => id !== context.joinedUserId
-      );
-
-    if (adminRecipients.length > 0) {
-
-      await EventService.createWithoutTransaction({
-
-        type: EventType.WORKSPACE_MEMBER_JOINED,
-
-        audience: EventAudience.CLIENT,
-
-        createdById: data.createdById,
-
-        resourceType: EventResourceType.WORKSPACE,
-
-        resourceId: context.workspaceId,
-
-        title: "Workspace Member Joined",
-
-        description:
-          `${context.joinedUserName} joined ${context.workspaceName}.`,
-
-        metadata: {
-
-          workspaceId: context.workspaceId,
-
-          joinedUserId: context.joinedUserId,
-
-        },
-
-        recipientIds: adminRecipients,
-
-      });
-
-    }
-
-    //
     // Notify the joined member
     //
 
@@ -195,48 +154,6 @@ static async workspaceMemberRemoved(
   }
 
   //
-  // Notify workspace owner/admins
-  //
-
-  const adminRecipients =
-    context.recipientIds.filter(
-      id => id !== context.removedUserId
-    );
-
-  if (adminRecipients.length > 0) {
-
-    await EventService.createWithoutTransaction({
-
-      type: EventType.WORKSPACE_MEMBER_REMOVED,
-
-      audience: EventAudience.CLIENT,
-
-      createdById: data.createdById,
-
-      resourceType: EventResourceType.WORKSPACE,
-
-      resourceId: context.workspaceId,
-
-      title: "Workspace Member Removed",
-
-      description:
-        `${context.removedUserName} was removed from ${context.workspaceName}.`,
-
-      metadata: {
-
-        workspaceId: context.workspaceId,
-
-        removedUserId: context.removedUserId,
-
-      },
-
-      recipientIds: adminRecipients,
-
-    });
-
-  }
-
-  //
   // Notify removed member
   //
 
@@ -265,6 +182,51 @@ static async workspaceMemberRemoved(
 
     recipientIds: [
       context.removedUserId,
+    ],
+
+  });
+
+}
+
+static async workspaceMemberLeft(
+  data: WorkspaceMemberLeftJobData
+): Promise<void> {
+
+  const context =
+    await WorkspaceRecipientResolver.resolveWorkspaceMemberLeft(
+      data.workspaceId,
+      data.leftUserId
+    );
+
+  if (!context) {
+    return;
+  }
+
+  await EventService.createWithoutTransaction({
+
+    type: EventType.WORKSPACE_MEMBER_LEFT,
+
+    audience: EventAudience.CLIENT,
+
+    createdById: data.createdById,
+
+    resourceType: EventResourceType.WORKSPACE,
+
+    resourceId: context.workspaceId,
+
+    title: "Left Workspace",
+
+    description:
+      `You left ${context.workspaceName}.`,
+
+    metadata: {
+
+      workspaceId: context.workspaceId,
+
+    },
+
+    recipientIds: [
+      context.leftUserId,
     ],
 
   });

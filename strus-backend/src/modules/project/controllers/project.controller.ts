@@ -14,6 +14,8 @@ import type { TransferProjectDto } from "../dtos/transfer-project.dto.js";
 import { transferProjectSchema } from "../dtos/transfer-project.dto.js";
 import { getIO } from "../../../core/socket/socket.js";
 import { SocketEvents } from "../../../core/socket/socket-events.js";
+import { ProjectStatus } from "../../../generated/prisma/enums.js";
+import { ProjectPublisher } from "../../event/publishers/project.publisher.js";
 
 export class ProjectController {
   // ==================================================
@@ -47,6 +49,14 @@ export class ProjectController {
               dto
             )
         );
+
+      await ProjectPublisher.publishProjectCreated({
+
+  createdById: userId,
+
+  projectId: project.id,
+
+});
 
       await Promise.all([
   ProjectCache.invalidateWorkspace(
@@ -244,6 +254,14 @@ static async update(
           )
       );
 
+    await ProjectPublisher.publishProjectUpdated({
+
+  createdById: userId,
+
+  projectId: project.id,
+
+});
+
     await Promise.all([
   ProjectCache.invalidate(projectId),
 
@@ -286,42 +304,50 @@ static async delete(
   try {
     const userId = req.user.id;
 
-    const { projectId } =
-      req.params;
+    const { projectId } = req.params;
 
-    const workspaceId =
-      await prisma.$transaction(
-        (tx) =>
-          ProjectService.delete(
-            tx,
-            projectId,
-            userId
-          )
-      );
+    const deletedProject =
+      await prisma.$transaction(async (tx) => {
+        return ProjectService.delete(
+          tx,
+          projectId,
+          userId
+        );
+      });
+
+    await ProjectPublisher.publishProjectDeleted({
+      projectId: deletedProject.projectId,
+
+      projectTitle: deletedProject.projectTitle,
+
+      workspaceId: deletedProject.workspaceId,
+
+      createdById: userId,
+
+      clientRecipientIds:
+        deletedProject.clientRecipientIds,
+
+      professionalRecipientIds:
+        deletedProject.professionalRecipientIds,
+    });
 
     await Promise.all([
-  ProjectCache.invalidate(
-    projectId
-  ),
+      ProjectCache.invalidate(
+        deletedProject.projectId
+      ),
 
-  ProjectCache.invalidateWorkspace(
-    workspaceId
-  ),
+      ProjectCache.invalidateWorkspace(
+        deletedProject.workspaceId
+      ),
 
-  ProjectAuditCache.invalidate(
-    projectId
-  ),
-
-  ProjectCache.invalidateRelatedDashboards(
-    projectId
-  ),
-]);
+      ProjectCache.invalidateRelatedDashboards(
+        deletedProject.projectId
+      ),
+    ]);
 
     res.status(200).json({
       success: true,
-
-      message:
-        "Project deleted successfully.",
+      message: "Project deleted successfully.",
     });
   } catch (error) {
     next(error);
@@ -360,23 +386,58 @@ static async updateStatus(
           )
       );
 
+    // ==========================================
+    // Publish Notifications
+    // ==========================================
+
+    switch (dto.status) {
+
+      case ProjectStatus.ACTIVE:
+
+        await ProjectPublisher.publishProjectActivated({
+
+          createdById: userId,
+
+          projectId,
+
+        });
+
+        break;
+
+      case ProjectStatus.COMPLETED:
+
+        await ProjectPublisher.publishProjectCompleted({
+
+          createdById: userId,
+
+          projectId,
+
+        });
+
+        break;
+
+      default:
+        break;
+
+    }
+
     await Promise.all([
-  ProjectCache.invalidate(
-    projectId
-  ),
+      ProjectCache.invalidate(
+        projectId
+      ),
 
-  ProjectCache.invalidateWorkspace(
-    project.workspaceId
-  ),
+      ProjectCache.invalidateWorkspace(
+        project.workspaceId
+      ),
 
-  ProjectAuditCache.invalidate(
-    projectId
-  ),
+      ProjectAuditCache.invalidate(
+        projectId
+      ),
 
-  ProjectCache.invalidateRelatedDashboards(
-    projectId
-  ),
-]);
+      ProjectCache.invalidateRelatedDashboards(
+        projectId
+      ),
+    ]);
 
     res.status(200).json({
       success: true,
@@ -432,6 +493,19 @@ static async transfer(
             userId
           )
       );
+
+    await ProjectPublisher.publishProjectTransferred({
+
+  createdById: userId,
+
+  projectId: project.id,
+
+  previousWorkspaceId,
+
+  destinationWorkspaceId:
+    dto.destinationWorkspaceId,
+
+});
 
     await Promise.all([
   ProjectCache.invalidate(
