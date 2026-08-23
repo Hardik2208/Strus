@@ -35,3 +35,4 @@ export interface DashboardActivityFilters {
   cursor?: EventCursor;
   limit: number;
 }
+

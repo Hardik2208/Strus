@@ -3,6 +3,7 @@ import { prisma } from "../../../core/database/prisma.js";
 
 import { EventRepository } from "../repositories/event.repository.js";
 import { EventMapper } from "../mapper/event.mapper.js";
+import { NotificationDispatcherService } from "./notification-dispatcher.service.js";
 
 import type {
   DashboardActivityResponse,
@@ -68,14 +69,24 @@ export class EventService {
 }
 
   static async createWithoutTransaction(
-    dto: CreateEventDto
-  ): Promise<EventResponse> {
-    return prisma.$transaction(
-      async (tx) => {
-        return this.create(tx, dto);
-      }
-    );
-  }
+  dto: CreateEventDto
+): Promise<EventResponse> {
+
+  const response = await prisma.$transaction(
+    async (tx) => {
+      return this.create(tx, dto);
+    }
+  );
+
+  // ==================================================
+  // Dispatch Notifications
+  // ==================================================
+
+  await NotificationDispatcherService.dispatch(dto);
+
+  return response;
+
+}
 
   // ==================================================
   // Client Dashboard Activities

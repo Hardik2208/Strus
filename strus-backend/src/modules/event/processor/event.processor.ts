@@ -10,6 +10,9 @@ import { WorkspaceNotificationFactory } from "../factories/workspace-event.facto
 import { ProjectNotificationFactory } from "../factories/project-event.factory.js";
 import { AgreementNotificationFactory } from "../factories/agreement-event.factory.js";
 import { ExecutionNotificationFactory } from "../factories/execution-event.factory.js";
+import { NegotiationNotificationFactory } from "../factories/negotiation.notification.factory.js";
+import { DisputeNotificationFactory } from "../factories/dispute.notification.factory.js";
+import { ActionRequestNotificationFactory } from "../factories/action-request.notification.factory.js";
 
 export class EventProcessor {
   /**
@@ -25,127 +28,132 @@ export class EventProcessor {
       // Workspace Notifications
       //
 
-      case NotificationJobType.WORKSPACE_CREATED:
+      case NotificationJobType.WORKSPACE_CREATED:{
         await WorkspaceNotificationFactory.workspaceCreated(
           job.payload
         );
-        return;
+        break;
+}
 
-      case NotificationJobType.WORKSPACE_DELETED:
+      case NotificationJobType.WORKSPACE_DELETED:{
         await WorkspaceNotificationFactory.workspaceDeleted(
           job.payload
         );
-        return;
+        break;
+}
 
-      case NotificationJobType.WORKSPACE_MEMBER_JOINED:
+      case NotificationJobType.WORKSPACE_MEMBER_JOINED:{
         await WorkspaceNotificationFactory.workspaceMemberJoined(
           job.payload
         );
-        return;
+        break;
+}
 
-      case NotificationJobType.WORKSPACE_MEMBER_REMOVED:
+      case NotificationJobType.WORKSPACE_MEMBER_REMOVED:{
         await WorkspaceNotificationFactory.workspaceMemberRemoved(
           job.payload
         );
-        return;
+        break;
+}
 
-      case NotificationJobType.WORKSPACE_OWNERSHIP_TRANSFERRED:
+      case NotificationJobType.WORKSPACE_OWNERSHIP_TRANSFERRED:{
         await WorkspaceNotificationFactory.workspaceOwnershipTransferred(
           job.payload
         );
-        return;
+        break;
+}
 
-      case NotificationJobType.WORKSPACE_MEMBER_LEFT:
+      case NotificationJobType.WORKSPACE_MEMBER_LEFT:{
         await WorkspaceNotificationFactory.workspaceMemberLeft(
           job.payload
         );
-        return;
+        break;
+}
 
       //
       // Project Notifications
       //
 
-      case NotificationJobType.PROJECT_CREATED:
+      case NotificationJobType.PROJECT_CREATED:{
         await ProjectNotificationFactory.projectCreated(
           job.payload
         );
-        return;
+        break;}
 
-      case NotificationJobType.PROJECT_UPDATED:
+      case NotificationJobType.PROJECT_UPDATED:{
         await ProjectNotificationFactory.projectUpdated(
           job.payload
         );
-        return;
+        break;}
 
-      case NotificationJobType.PROJECT_ACTIVATED:
+      case NotificationJobType.PROJECT_ACTIVATED:{
         await ProjectNotificationFactory.projectActivated(
           job.payload
         );
-        return;
+        break;}
 
-      case NotificationJobType.PROJECT_COMPLETED:
+      case NotificationJobType.PROJECT_COMPLETED:{
         await ProjectNotificationFactory.projectCompleted(
           job.payload
         );
-        return;
+        break;}
 
-      case NotificationJobType.PROJECT_DELETED:
+      case NotificationJobType.PROJECT_DELETED:{
         await ProjectNotificationFactory.projectDeleted(
           job.payload
         );
-        return;
+        break;}
 
-      case NotificationJobType.PROJECT_TRANSFERRED:
+      case NotificationJobType.PROJECT_TRANSFERRED:{
         await ProjectNotificationFactory.projectTransferred(
           job.payload
         );
-        return;
+        break;}
 //
 // Agreement Notifications
 //
 
-case NotificationJobType.AGREEMENT_CREATED:
+case NotificationJobType.AGREEMENT_CREATED:{
   await AgreementNotificationFactory.agreementCreated(
     job.payload
   );
-  return;
+  break;}
 
-case NotificationJobType.AGREEMENT_UPDATED:
+case NotificationJobType.AGREEMENT_UPDATED:{
   await AgreementNotificationFactory.agreementUpdated(
     job.payload
   );
-  return;
+  break;}
 
-case NotificationJobType.AGREEMENT_PROFESSIONAL_INVITED:
+case NotificationJobType.AGREEMENT_PROFESSIONAL_INVITED:{
   await AgreementNotificationFactory.professionalInvited(
     job.payload
   );
-  return;
+  break;}
 
-case NotificationJobType.AGREEMENT_INVITATION_ACCEPTED:
+case NotificationJobType.AGREEMENT_INVITATION_ACCEPTED:{
   await AgreementNotificationFactory.invitationAccepted(
     job.payload
   );
-  return;
+  break;}
 
-case NotificationJobType.AGREEMENT_INVITATION_DECLINED:
+case NotificationJobType.AGREEMENT_INVITATION_DECLINED:{
   await AgreementNotificationFactory.invitationDeclined(
     job.payload
   );
-  return;
+  break;}
 
-case NotificationJobType.AGREEMENT_INVITATION_WITHDRAWN:
+case NotificationJobType.AGREEMENT_INVITATION_WITHDRAWN:{
   await AgreementNotificationFactory.invitationWithdrawn(
     job.payload
   );
-  return;
+  break;}
 
-case NotificationJobType.AGREEMENT_PROFESSIONAL_REMOVED:
+case NotificationJobType.AGREEMENT_PROFESSIONAL_REMOVED:{
   await AgreementNotificationFactory.professionalRemoved(
     job.payload
   );
-  return;
-      default:
+  break;}
 
 // ======================================================
 // Execution
@@ -230,6 +238,130 @@ case NotificationJobType.MILESTONE_COMPLETED: {
   break;
 
 }
+
+// ======================================================
+// Negotiation
+// ======================================================
+
+case NotificationJobType.NEGOTIATION_CREATED: {
+
+  await NegotiationNotificationFactory.negotiationCreated(
+    job.payload
+  );
+
+  break;
+
+}
+
+case NotificationJobType.NEGOTIATION_ACCEPTED: {
+
+  await NegotiationNotificationFactory.negotiationAccepted(
+    job.payload
+  );
+
+  break;
+
+}
+
+case NotificationJobType.NEGOTIATION_DECLINED: {
+
+  await NegotiationNotificationFactory.negotiationDeclined(
+    job.payload
+  );
+
+  break;
+
+}
+
+case NotificationJobType.NEGOTIATION_EXPIRED: {
+
+  await NegotiationNotificationFactory.negotiationExpired(
+    job.payload
+  );
+
+  break;
+
+}
+
+// ======================================================
+// Dispute
+// ======================================================
+
+case NotificationJobType.DISPUTE_CREATED: {
+
+  await DisputeNotificationFactory.disputeCreated(
+    job.payload
+  );
+
+  break;
+
+}
+
+case NotificationJobType.DISPUTE_RESOLUTION_PROPOSED: {
+
+  await DisputeNotificationFactory.disputeResolutionProposed(
+    job.payload
+  );
+
+  break;
+
+}
+
+case NotificationJobType.DISPUTE_RESOLVED: {
+
+  await DisputeNotificationFactory.disputeResolved(
+    job.payload
+  );
+
+  break;
+
+}
+
+case NotificationJobType.DISPUTE_CLOSED: {
+
+  await DisputeNotificationFactory.disputeClosed(
+    job.payload
+  );
+
+  break;
+
+}
+
+// ======================================================
+// Action Request
+// ======================================================
+
+case NotificationJobType.ACTION_REQUEST_CREATED: {
+
+  await ActionRequestNotificationFactory.actionRequestCreated(
+    job.payload
+  );
+
+  break;
+
+}
+
+case NotificationJobType.ACTION_REQUEST_RESPONDED: {
+
+  await ActionRequestNotificationFactory.actionRequestResponded(
+    job.payload
+  );
+
+  break;
+
+}
+
+case NotificationJobType.ACTION_REQUEST_EXPIRED: {
+
+  await ActionRequestNotificationFactory.actionRequestExpired(
+    job.payload
+  );
+
+  break;
+
+}
+
+default:
         return;
 
     }

@@ -16,7 +16,7 @@ import { ErrorCode } from "../../../core/errors/ErrorCodes.js";
 import { AgreementRepository } from "../repositories/agreement.repository.js";
 import { AgreementAuditRepository } from "../repositories/agreement-audit.repository.js";
 
-import { AgreementPermissionService } from "../services/agreement-permission.service.js";
+import { AgreementPermissionService } from "./agreement-permission.service.js";
 
 import { AgreementValidator } from "../validators/agreement.validator.js";
 

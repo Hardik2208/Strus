@@ -29,7 +29,6 @@ The Professional Dashboard Module is responsible for:
 
 - Dashboard overview aggregation.
 - Active project summaries.
-- Recent activity timeline.
 - Dashboard quick actions.
 - Redis-based widget caching.
 
@@ -147,21 +146,6 @@ Current information includes:
 
 ---
 
-## Recent Activity
-
-Provides a unified activity timeline.
-
-Current sources include:
-
-- Project Audit
-- Agreement Audit
-
-Activities are merged into a single chronological feed.
-
-Supports configurable activity limits.
-
----
-
 ## Quick Actions
 
 Provides navigation shortcuts to commonly used Professional Dashboard pages.
@@ -171,7 +155,6 @@ Current actions include:
 - View Invitations
 - Continue Latest Project
 - Open Active Projects
-- View Recent Activity
 
 Invitation-related behaviour follows the Agreement Module documentation.
 
@@ -199,7 +182,6 @@ Cached widgets include:
 
 - Overview
 - Active Projects
-- Recent Activity
 
 Each widget maintains an independent Redis cache.
 
@@ -230,7 +212,6 @@ Current implementation includes:
 
 - Professional Dashboard Overview
 - Professional Active Projects
-- Professional Recent Activity
 - Professional Quick Actions
 - Independent Redis caching
 
@@ -330,7 +311,6 @@ Responsible for:
 - Dashboard queries
 - Aggregate counts
 - Active project retrieval
-- Activity retrieval
 - Optimized joins
 
 Repositories never contain business logic.
@@ -434,39 +414,6 @@ Any business rules regarding agreement participants or invitations follow the Ag
 
 ---
 
-# Recent Activity Widget Flow
-
-```text
-Professional
-      │
-      ▼
-Dashboard Controller
-      │
-      ▼
-Recent Activity Service
-      │
-      ▼
-Project Audit Repository
-Agreement Audit Repository
-      │
-      ▼
-Merge Activities
-      │
-      ▼
-Sort by Timestamp
-      │
-      ▼
-Apply Activity Limit
-      │
-      ▼
-Redis Cache
-      │
-      ▼
-Response
-```
-
----
-
 # Quick Actions Widget Flow
 
 ```text
@@ -562,14 +509,6 @@ dashboard:professional:active-projects:{userId}
 
 ---
 
-## Recent Activity
-
-```text
-dashboard:professional:recent-activity:{userId}:{activityLimit}
-```
-
----
-
 ## Quick Actions
 
 ```text
@@ -615,16 +554,6 @@ Invalidate after:
 - Milestone Extension Created
 
 Agreement-related invalidation follows the Agreement Module documentation.
-
----
-
-## Recent Activity
-
-Invalidate after:
-
-- Project Audit Created
-- Agreement Audit Created
-- Execution Audit Created
 
 ---
 
@@ -718,7 +647,6 @@ The current architecture supports:
 
 - Professional Dashboard Overview
 - Professional Active Projects
-- Professional Recent Activity
 - Professional Quick Actions
 - Widget-level Redis caching
 - Cross-module aggregation
@@ -826,37 +754,6 @@ Professional Dashboard never modifies project information.
 
 ---
 
-# Rule 6 — Recent Activity Widget
-
-The Recent Activity widget provides a unified activity timeline.
-
-Current sources include:
-
-- Project Audit
-- Agreement Audit
-
-Rules
-
-- Activities are merged into a single feed.
-- Results are ordered by newest first.
-- Deleted project activities are excluded.
-- Historical ordering is preserved.
-- Activity limits are enforced.
-
----
-
-# Rule 7 — Activity Limit
-
-Recent Activity supports configurable limits.
-
-Rules
-
-- Default limit is applied when omitted.
-- Invalid limits fall back to the default.
-- Maximum limits are enforced to protect database performance.
-
----
-
 # Rule 8 — Quick Actions Widget
 
 Quick Actions provide navigation shortcuts for commonly used professional workflows.
@@ -866,7 +763,6 @@ Current actions include:
 - View Invitations
 - Continue Latest Project
 - Active Projects
-- Recent Activity
 
 Rules
 
@@ -964,7 +860,6 @@ Rules
 
 - Overview counts must match underlying data.
 - Active Projects must reflect the latest project status.
-- Recent Activity ordering must remain chronological.
 - Widget responses remain independent.
 
 ---
@@ -977,7 +872,6 @@ Cached widgets include:
 
 - Overview
 - Active Projects
-- Recent Activity
 - Quick Actions
 
 Rules
@@ -1031,16 +925,6 @@ Invalidate after:
 - Milestone Extension Created
 
 Agreement-related cache invalidation follows the Agreement Module documentation.
-
----
-
-Recent Activity
-
-Invalidate after:
-
-- Project Audit Created
-- Agreement Audit Created
-- Execution Audit Created
 
 ---
 
@@ -1339,113 +1223,6 @@ None
 
 ---
 
-# GET /api/v1/dashboard/professional/recent-activity
-
-## Purpose
-
-Returns the authenticated professional's recent dashboard activity.
-
----
-
-## Authentication
-
-Access Token
-
----
-
-## Request
-
-Supports optional query parameter.
-
-```text
-?activityLimit=10
-```
-
----
-
-## Query Parameters
-
-| Parameter | Default | Description |
-|----------|---------|-------------|
-| activityLimit | 10 | Maximum number of activities returned |
-
----
-
-## Success
-
-**HTTP**
-
-```text
-200 OK
-```
-
-**Response**
-
-```json
-{
-    "success": true,
-    "data": [
-        {
-            "id": "audit_uuid",
-            "type": "PROJECT_CREATED",
-            "title": "Website Development",
-            "description": "Project created successfully.",
-            "createdAt": "2026-07-18T18:20:00.000Z"
-        },
-        {
-            "id": "audit_uuid",
-            "type": "AGREEMENT_UPDATED",
-            "title": "Agreement Updated",
-            "description": "Budget updated.",
-            "createdAt": "2026-07-18T17:40:00.000Z"
-        }
-    ]
-}
-```
-
----
-
-## Business Rules
-
-- Activities are merged from Project Audit and Agreement Audit.
-- Ordered by newest first.
-- Deleted project activities are excluded.
-- Maximum activity limit is enforced.
-- Response is cached.
-
-Agreement audit behaviour follows the Agreement Module documentation.
-
----
-
-## Database Changes
-
-None
-
----
-
-## Redis
-
-Reads
-
-```text
-dashboard:professional:recent-activity:{userId}:{activityLimit}
-```
-
-Cache Miss
-
-- Query audit repositories
-- Merge activities
-- Sort chronologically
-- Store response
-
----
-
-## Socket Events
-
-None
-
----
-
 # GET /api/v1/dashboard/professional/quick-actions
 
 ## Purpose
@@ -1549,7 +1326,6 @@ The Professional Dashboard maintains independent caches for every widget.
 |---------|-----------|
 | Overview | `dashboard:professional:overview:{userId}` |
 | Active Projects | `dashboard:professional:active-projects:{userId}` |
-| Recent Activity | `dashboard:professional:recent-activity:{userId}:{activityLimit}` |
 | Quick Actions | `dashboard:professional:quick-actions:{userId}` |
 
 ---
@@ -1587,23 +1363,6 @@ Agreement-related invalidation follows the Agreement Module documentation.
 
 ---
 
-## Recent Activity
-
-Invalidated after:
-
-- Project Status Changed
-- Professional Assignment Updated
-- Milestone Created
-- Milestone Updated
-- Milestone Deleted
-- Submission Created
-- Submission Approved
-- Revision Requested
-- Submission Auto Approved
-- Milestone Extension Created
-
----
-
 ## Quick Actions
 
 Invalidated whenever navigation data changes.
@@ -1620,7 +1379,6 @@ Invitation-related invalidation follows the Agreement Module documentation.
 |---------|----------|
 | GET | `/api/v1/dashboard/professional/overview` |
 | GET | `/api/v1/dashboard/professional/active-projects` |
-| GET | `/api/v1/dashboard/professional/recent-activity` |
 | GET | `/api/v1/dashboard/professional/quick-actions` |
 
 ####################################################################################################################
@@ -1741,65 +1499,6 @@ type ActiveProjectsResponse = ActiveProjectItem[];
 
 ---
 
-# Recent Activity Response
-
-Returned by:
-
-```text
-GET /api/v1/dashboard/professional/recent-activity
-```
-
----
-
-## Response Model
-
-```ts
-interface ProfessionalRecentActivityItem {
-    id: string;
-
-    type: string;
-
-    title: string;
-
-    description: string;
-
-    createdAt: string;
-}
-
-type ProfessionalRecentActivityResponse =
-    ProfessionalRecentActivityItem[];
-```
-
----
-
-## Example Response
-
-```json
-{
-    "success": true,
-    "data": [
-        {
-            "id": "audit_uuid",
-            "type": "PROJECT_CREATED",
-            "title": "Website Development",
-            "description": "Project created successfully.",
-            "createdAt": "2026-07-18T18:20:00.000Z"
-        },
-        {
-            "id": "audit_uuid",
-            "type": "AGREEMENT_UPDATED",
-            "title": "Agreement Updated",
-            "description": "Budget updated.",
-            "createdAt": "2026-07-18T17:40:00.000Z"
-        }
-    ]
-}
-```
-
-Agreement-related activity follows the Agreement Module documentation.
-
----
-
 # Quick Actions Response
 
 Returned by:
@@ -1895,7 +1594,6 @@ interface ErrorResponse {
 |----------|---------------|
 | Overview | ProfessionalDashboardOverviewResponse |
 | Active Projects | ActiveProjectsResponse |
-| Recent Activity | ProfessionalRecentActivityResponse |
 | Quick Actions | ProfessionalQuickActionsResponse |
 
 ---
@@ -2027,7 +1725,6 @@ The Professional Dashboard maintains an independent cache for every widget.
 |---------|-----------|
 | Overview | `dashboard:professional:overview:{userId}` |
 | Active Projects | `dashboard:professional:active-projects:{userId}` |
-| Recent Activity | `dashboard:professional:recent-activity:{userId}:{activityLimit}` |
 | Quick Actions | `dashboard:professional:quick-actions:{userId}` |
 
 Each widget cache is completely independent.
@@ -2042,7 +1739,6 @@ Professional Dashboard caches use a Time-To-Live (TTL) to prevent stale data.
 |---------|-----------------|
 | Overview | 5 Minutes |
 | Active Projects | 2 Minutes |
-| Recent Activity | 2 Minutes |
 
 Cache expiration acts only as a fallback mechanism.
 
@@ -2099,27 +1795,6 @@ Cache Key
 ```text
 dashboard:professional:active-projects:{userId}
 ```
-
----
-
-## Recent Activity Cache
-
-Invalidate after:
-
-- Project Audit Created
-- Agreement Audit Created
-- Execution Audit Created
-
-Agreement audit behaviour follows the Agreement Module documentation.
-
-Cache Key
-
-```text
-dashboard:professional:recent-activity:{userId}:{activityLimit}
-```
-
-Since activities can be requested with different limits, all matching activity cache keys for the authenticated professional should be invalidated.
-
 ---
 
 ## Quick Actions Cache
@@ -2255,7 +1930,6 @@ dashboard/
 │     ├── professional-dashboard.service.ts
 │     ├── overview.service.ts
 │     ├── active-projects.service.ts
-│     ├── recent-activity.service.ts
 │     └── quick-actions.service.ts
 │
 ├── repositories/
@@ -2264,7 +1938,6 @@ dashboard/
 ├── dto/
 │     ├── overview-response.dto.ts
 │     ├── active-project.dto.ts
-│     ├── recent-activity.dto.ts
 │     └── quick-actions.dto.ts
 │
 ├── routes/
@@ -2311,7 +1984,6 @@ Current services include:
 
 - Overview Service
 - Active Projects Service
-- Recent Activity Service
 - Quick Actions Service
 
 Responsibilities:
@@ -2334,7 +2006,6 @@ Responsibilities:
 - Aggregate queries
 - Read-only joins
 - Dashboard projections
-- Activity retrieval
 - Performance optimization
 
 Repositories never contain business logic.
@@ -2349,7 +2020,6 @@ Examples include:
 
 - Overview Response
 - Active Project Response
-- Activity Response
 - Quick Action Response
 
 DTOs remain independent from Prisma entities.
@@ -2361,7 +2031,6 @@ DTOs remain independent from Prisma entities.
 Responsible for validating:
 
 - Query parameters
-- Activity limits
 - Pagination parameters
 - Request formats
 

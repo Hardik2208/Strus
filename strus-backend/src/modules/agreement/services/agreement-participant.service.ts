@@ -13,7 +13,7 @@ import { ErrorCode } from "../../../core/errors/ErrorCodes.js";
 
 import { AgreementRepository } from "../repositories/agreement.repository.js";
 import { AgreementAuditRepository } from "../repositories/agreement-audit.repository.js";
-import { AgreementPermissionService } from "../services/agreement-permission.service.js";
+import { AgreementPermissionService } from "./agreement-permission.service.js";
 
 import { AgreementParticipantCache } from "../cache/agreement-participant.cache.js";
 import { AgreementAuditCache } from "../cache/agreement-audit.cache.js";

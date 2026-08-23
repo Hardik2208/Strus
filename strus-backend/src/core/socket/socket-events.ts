@@ -86,4 +86,20 @@ CONVERSATION_JOINED:
 CONVERSATION_LEFT:
   "communication:conversation:left",
 
+// ==================================================
+// Negotiation
+// ==================================================
+
+NEGOTIATION_ACTION_REQUEST_CREATED:
+  "negotiation:action-request:created",
+
+NEGOTIATION_ACCEPTED:
+  "negotiation:accepted",
+
+NEGOTIATION_DECLINED:
+  "negotiation:declined",
+
+NEGOTIATION_EXPIRED:
+  "negotiation:expired",
+
 } as const;

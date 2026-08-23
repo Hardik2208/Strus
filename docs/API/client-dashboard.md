@@ -29,7 +29,6 @@ The Dashboard Module is responsible for:
 
 - Dashboard overview aggregation.
 - Dashboard attention widgets.
-- Dashboard activity timeline.
 - Dashboard Redis caching.
 
 ---
@@ -158,21 +157,6 @@ Future implementations may include:
 
 ---
 
-## Recent Activity
-
-Provides a unified activity timeline.
-
-Current sources:
-
-- Project Audit
-- Agreement Audit
-
-Activities are merged into a single chronological feed.
-
-Supports configurable activity limits.
-
----
-
 # Dashboard Philosophy
 
 The Dashboard Module never duplicates APIs that already exist in other modules.
@@ -197,7 +181,6 @@ Cached widgets include:
 
 - Dashboard Overview
 - Dashboard Requires Attention
-- Dashboard Recent Activity
 
 Each widget maintains an independent Redis cache.
 
@@ -226,7 +209,6 @@ Current implementation includes:
 
 - Client Dashboard Overview
 - Client Requires Attention
-- Client Recent Activity
 - Independent Redis caching
 
 Future versions will introduce:
@@ -324,7 +306,6 @@ Responsible for:
 
 - Dashboard queries
 - Aggregate counts
-- Activity retrieval
 - Optimized joins
 - Pagination
 
@@ -433,39 +414,6 @@ Future implementations may additionally query:
 
 ---
 
-# Recent Activity Flow
-
-```text
-Client
-    │
-    ▼
-Dashboard Controller
-    │
-    ▼
-Activity Service
-    │
-    ▼
-Project Audit Repository
-Agreement Audit Repository
-    │
-    ▼
-Merge Activities
-    │
-    ▼
-Sort By Timestamp
-    │
-    ▼
-Apply Limit
-    │
-    ▼
-Redis Cache
-    │
-    ▼
-Response
-```
-
----
-
 # Redis Cache Strategy
 
 The Dashboard Module follows the Cache-Aside pattern.
@@ -532,14 +480,6 @@ dashboard:client:requires-attention:{userId}
 
 ---
 
-## Recent Activity
-
-```text
-dashboard:client:recent-activity:{userId}:{limit}
-```
-
----
-
 # Cache Invalidation
 
 ## Overview
@@ -571,22 +511,6 @@ Invalidate after:
 - Invitation Accepted
 - Invitation Declined
 - Invitation Withdrawn
-
----
-
-## Recent Activity
-
-Invalidate after:
-
-- Agreement Invitation Created
-- Invitation Accepted
-- Invitation Declined
-- Invitation Withdrawn
-- Submission Created
-- Submission Approved
-- Revision Requested
-- Submission Auto Approved
-- Milestone Extension Created
 
 ---
 
@@ -670,7 +594,6 @@ The current architecture supports:
 
 - Client Overview
 - Client Requires Attention
-- Client Recent Activity
 - Widget-level Redis caching
 - Cross-module aggregation
 
@@ -778,37 +701,6 @@ Future implementations may additionally include:
 
 ---
 
-# Rule 6 — Recent Activity Widget
-
-The Recent Activity widget returns a unified activity timeline.
-
-Current sources include:
-
-- Project Audit
-- Agreement Audit
-
-Rules
-
-- Activities are merged into a single feed.
-- Results are ordered by newest first.
-- Deleted project activities are excluded.
-- Activity limits are enforced.
-- Historical ordering is preserved.
-
----
-
-# Rule 7 — Activity Limit
-
-Recent Activity supports configurable limits.
-
-Rules
-
-- Default limit is applied when omitted.
-- Invalid limits fall back to the default.
-- Maximum limit is enforced to prevent excessive queries.
-
----
-
 # Rule 8 — Aggregation Rules
 
 Dashboard widgets aggregate information from multiple modules.
@@ -866,7 +758,6 @@ Cached widgets include:
 
 - Overview
 - Requires Attention
-- Recent Activity
 
 Rules
 
@@ -898,11 +789,6 @@ Requires Attention cache is invalidated after:
 - Invitation Declined
 - Invitation Withdrawn
 
-Recent Activity cache is invalidated after:
-
-- Project Audit Created
-- Agreement Audit Created
-- Execution Audit Created
 
 ---
 
@@ -925,7 +811,6 @@ Dashboard widgets must always remain internally consistent.
 Rules
 
 - Widget counts must match underlying data.
-- Recent Activity ordering must remain chronological.
 - Requires Attention count must equal the number of returned pending items.
 
 ---
@@ -1219,109 +1104,6 @@ None
 
 ---
 
-# GET /api/v1/dashboard/client/client-dashboard/recent-activity
-
-## Purpose
-
-Returns the authenticated client's recent dashboard activity.
-
----
-
-## Authentication
-
-Access Token
-
----
-
-## Request
-
-Supports optional query parameter.
-
-```text
-?activityLimit=10
-```
-
----
-
-## Query Parameters
-
-| Parameter | Default | Description |
-|----------|---------|-------------|
-| activityLimit | 10 | Maximum number of activities returned |
-
----
-
-## Success
-
-**HTTP**
-
-```text
-200 OK
-```
-
-```json
-{
-    "success": true,
-    "data": [
-        {
-            "id": "...",
-            "type": "PROJECT_CREATED",
-            "title": "Execution Testing Project",
-            "description": "Project created.",
-            "createdAt": "2026-07-18T18:10:00.000Z"
-        },
-        {
-            "id": "...",
-            "type": "AGREEMENT_UPDATED",
-            "title": "Agreement Updated",
-            "description": "Budget updated.",
-            "createdAt": "2026-07-18T17:45:00.000Z"
-        }
-    ]
-}
-```
-
----
-
-## Business Rules
-
-- Activities are merged from multiple modules.
-- Ordered by newest first.
-- Deleted project activities are excluded.
-- Maximum activity limit is enforced.
-- Response is cached.
-
----
-
-## Database Changes
-
-None
-
----
-
-## Redis
-
-Reads
-
-```text
-dashboard:client:recent-activity:{userId}:{activityLimit}
-```
-
-Cache Miss
-
-- Query audit repositories
-- Merge activities
-- Sort chronologically
-- Store response
-
----
-
-## Socket Events
-
-None
-
----
-
 # Redis Cache
 
 The Dashboard Module maintains independent caches for every widget.
@@ -1330,7 +1112,6 @@ The Dashboard Module maintains independent caches for every widget.
 |---------|-----------|
 | Overview | `dashboard:client:overview:{userId}` |
 | Requires Attention | `dashboard:client:requires-attention:{userId}` |
-| Recent Activity | `dashboard:client:recent-activity:{userId}:{activityLimit}` |
 
 ---
 
@@ -1368,29 +1149,12 @@ Invalidated after:
 
 ---
 
-## Recent Activity
-
-Invalidate after:
-
-- Agreement Invitation Created
-- Invitation Accepted
-- Invitation Declined
-- Invitation Withdrawn
-- Submission Created
-- Submission Approved
-- Revision Requested
-- Submission Auto Approved
-- Milestone Extension Created
-
----
-
 # Current Endpoints
 
 | Method | Endpoint |
 |---------|----------|
 | GET | `/api/v1/dashboard/client/client-dashboard/overview` |
 | GET | `/api/v1/dashboard/client/client-dashboard/requires-attention` |
-| GET | `/api/v1/dashboard/client/client-dashboard/recent-activity` |
 
 ####################################################################################################################
 
@@ -1501,58 +1265,6 @@ type RequiresAttentionResponse = RequiresAttentionItem[];
 
 ---
 
-# Recent Activity Response
-
-Returned by:
-
-```text
-GET /api/v1/dashboard/client/client-dashboard/recent-activity
-```
-
----
-
-## Response Model
-
-```ts
-interface RecentActivityItem {
-    id: string;
-    type: string;
-    title: string;
-    description: string;
-    createdAt: string;
-}
-
-type RecentActivityResponse = RecentActivityItem[];
-```
-
----
-
-## Example Response
-
-```json
-{
-    "success": true,
-    "data": [
-        {
-            "id": "audit_uuid",
-            "type": "PROJECT_CREATED",
-            "title": "Execution Testing Project",
-            "description": "Project created successfully.",
-            "createdAt": "2026-07-18T18:20:00.000Z"
-        },
-        {
-            "id": "audit_uuid",
-            "type": "AGREEMENT_UPDATED",
-            "title": "Agreement Updated",
-            "description": "Agreement budget updated.",
-            "createdAt": "2026-07-18T17:40:00.000Z"
-        }
-    ]
-}
-```
-
----
-
 # Common Dashboard Response
 
 Every dashboard endpoint follows the standard API response format.
@@ -1587,7 +1299,6 @@ interface ErrorResponse {
 |----------|---------------|
 | Overview | DashboardOverviewResponse |
 | Requires Attention | RequiresAttentionResponse |
-| Recent Activity | RecentActivityResponse |
 
 ---
 
@@ -1705,7 +1416,6 @@ The Dashboard Module maintains an independent cache for every widget.
 |---------|-----------|
 | Overview | `dashboard:client:overview:{userId}` |
 | Requires Attention | `dashboard:client:requires-attention:{userId}` |
-| Recent Activity | `dashboard:client:recent-activity:{userId}:{activityLimit}` |
 
 Each widget cache is completely independent.
 
@@ -1719,7 +1429,6 @@ Dashboard caches use a Time-To-Live (TTL) to prevent stale data.
 |---------|-----------------|
 | Overview | 5 Minutes |
 | Requires Attention | 2 Minutes |
-| Recent Activity | 2 Minutes |
 
 Cache expiration serves as a fallback mechanism.
 
@@ -1775,24 +1484,6 @@ Cache Key
 ```text
 dashboard:client:requires-attention:{userId}
 ```
-
----
-
-## Recent Activity Cache
-
-Invalidate after:
-
-- Project Audit Created
-- Agreement Audit Created
-- Execution Audit Created
-
-Cache Key
-
-```text
-dashboard:client:recent-activity:{userId}:{activityLimit}
-```
-
-Since activity feeds can be requested with different limits, all matching activity cache keys for the user should be invalidated.
 
 ---
 

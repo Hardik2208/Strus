@@ -87,6 +87,7 @@ enum ProjectStatus {
   COMPLETED
   CANCELLED
   MUTUALLY_TERMINATED
+  DISPUTE_TERMINATED
 }
 
 enum ProjectAuditAction {
@@ -142,6 +143,11 @@ enum MilestoneStatus {
   SUBMITTED
   REVISION_REQUESTED
   REVISION_LIMIT_REACHED
+
+  NEGOTIATION
+
+  UNDER_DISPUTE
+
   COMPLETED
 }
 
@@ -167,6 +173,26 @@ enum ExecutionAuditAction {
   PROJECT_ASSET_CREATED
   PROJECT_ASSET_UPDATED
   PROJECT_ASSET_DELETED
+
+  NEGOTIATION_CREATED
+  NEGOTIATION_ACCEPTED
+  NEGOTIATION_DECLINED
+  NEGOTIATION_EXPIRED
+  NEGOTIATION_CONTINUATION_REQUESTED
+  NEGOTIATION_CONTINUED
+  NEGOTIATION_ON_HOLD
+
+  PRE_SUBMISSION_DISPUTE_CREATED
+  POST_SUBMISSION_DISPUTE_CREATED
+  DISPUTE_UNDER_REVIEW
+  DISPUTE_RESULT_PUBLISHED
+  DISPUTE_CONTINUATION_REQUESTED
+  DISPUTE_CONTINUED
+  DISPUTE_TERMINATED
+  DISPUTE_CLOSED
+
+  EXECUTION_PAUSED
+  EXECUTION_RESUMED
 }
 
 enum SubmissionStatus {
@@ -241,6 +267,14 @@ enum EventType {
   AGREEMENT_SIGNED
   AGREEMENT_REJECTED
 
+  AGREEMENT_CREATED
+  AGREEMENT_UPDATED
+  AGREEMENT_PROFESSIONAL_INVITED
+  AGREEMENT_INVITATION_ACCEPTED
+  AGREEMENT_INVITATION_DECLINED
+  AGREEMENT_INVITATION_WITHDRAWN
+  AGREEMENT_PROFESSIONAL_REMOVED
+
   // ======================================================
   // Project
   // ======================================================
@@ -254,18 +288,6 @@ enum EventType {
   PROJECT_CANCELLED
 
   // ======================================================
-  // Agreement
-  // ======================================================
-
-  AGREEMENT_CREATED
-  AGREEMENT_UPDATED
-  AGREEMENT_PROFESSIONAL_INVITED
-  AGREEMENT_INVITATION_ACCEPTED
-  AGREEMENT_INVITATION_DECLINED
-  AGREEMENT_INVITATION_WITHDRAWN
-  AGREEMENT_PROFESSIONAL_REMOVED
-
-  // ======================================================
   // Execution
   // ======================================================
 
@@ -277,6 +299,32 @@ enum EventType {
   EXTENSION_GRANTED
   MILESTONE_COMPLETED
   PROJECT_ASSET_SHARED
+
+  // ======================================================
+  // Negotiation
+  // ======================================================
+
+  NEGOTIATION_CREATED
+  NEGOTIATION_ACCEPTED
+  NEGOTIATION_DECLINED
+  NEGOTIATION_EXPIRED
+
+  // ======================================================
+  // Dispute
+  // ======================================================
+
+  DISPUTE_CREATED
+  DISPUTE_RESOLUTION_PROPOSED
+  DISPUTE_RESOLVED
+  DISPUTE_CLOSED
+
+  // ======================================================
+  // Action Request
+  // ======================================================
+
+  ACTION_REQUEST_CREATED
+  ACTION_REQUEST_RESPONDED
+  ACTION_REQUEST_EXPIRED
 }
 
 enum EventResourceType {
@@ -285,12 +333,95 @@ enum EventResourceType {
   AGREEMENT
   MILESTONE
   SUBMISSION
+
+  NEGOTIATION
+  DISPUTE
+  ACTION_REQUEST
 }
 
 enum EventAudience {
   CLIENT
   PROFESSIONAL
   BOTH
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLUTION_PROPOSED
+  CLOSED
+}
+
+enum SettlementProposal {
+  FULL_PAYMENT
+  PARTIAL_PAYMENT
+  NO_PAYMENT
+}
+
+enum NegotiationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum PartyResponseStatus {
+  WAITING_FOR_BOTH
+  WAITING_FOR_CLIENT
+  WAITING_FOR_PROFESSIONAL
+  COMPLETED
+  EXPIRED
+}
+
+enum ContinueProjectDecision {
+  CONTINUE
+  TERMINATE
+}
+
+enum ContinueProjectStatus {
+  PENDING
+  COMPLETED
+  TERMINATED
+}
+
+enum DisputeDecision {
+  FULL_PAYMENT
+  PARTIAL_PAYMENT
+  NO_PAYMENT
+}
+
+enum DisputeOrigin {
+  PRE_SUBMISSION
+  POST_SUBMISSION
+}
+
+enum NegotiationContinuationStatus {
+  PENDING
+  COMPLETED
+  ON_HOLD
+}
+
+enum ActionRequestType {
+  NEGOTIATION_CONTINUATION
+  DISPUTE_CONTINUATION
+}
+
+enum ActionRequestStatus {
+  PENDING
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+enum ActionParticipantStatus {
+  PENDING
+  RESPONDED
+  EXPIRED
+}
+
+enum ActionDecision {
+  CONTINUE
+  TERMINATE
 }
 
 //
@@ -393,6 +524,12 @@ model User {
   createdEvents Event[] @relation("EventCreatedBy")
 
   receivedEvents EventRecipient[]
+
+  createdDisputes Dispute[]
+
+  initiatedNegotiations Negotiation[] @relation("NegotiationInitiatedBy")
+
+  actionRequestParticipants ActionRequestParticipant[]
 
   @@index([status])
   @@index([verificationLevel])
@@ -713,6 +850,7 @@ model Project {
   projectAssets            ProjectAsset[]
   projectAssetVisibilities ProjectAssetVisibility[]
   conversation             Conversation?
+  negotiations Negotiation[]
 
   @@index([workspaceId])
   @@index([createdById])
@@ -881,6 +1019,9 @@ model Milestone {
   requirements     MilestoneRequirement[]
   submissions      MilestoneSubmission[]
   revisionRequests RevisionRequest[]
+
+  dispute Dispute?
+  negotiations Negotiation[]
 
   @@unique([agreementParticipantId, order])
   @@index([projectId])
@@ -1331,7 +1472,6 @@ model MessageEditHistory {
 }
 
 model Event {
-
   id String @id @default(uuid()) @db.Uuid
 
   //
@@ -1348,7 +1488,7 @@ model Event {
 
   createdById String @map("created_by_id") @db.Uuid
 
-  createdBy User @relation( "EventCreatedBy", fields: [createdById], references: [id], onDelete: Restrict )
+  createdBy User @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
 
   //
   // Resource
@@ -1385,15 +1525,10 @@ model Event {
   //
 
   @@index([type])
-
   @@index([createdById])
-
   @@index([type, resourceType, resourceId])
-
   @@index([audience, createdAt(sort: Desc)])
-
   @@index([createdAt(sort: Desc)])
-
   @@map("events")
 }
 
@@ -1417,21 +1552,188 @@ model EventRecipient {
   // Relations
   //
 
-  event Event @relation(fields: [eventId],references: [id],onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId],references: [id],onDelete: Cascade)
-
-  @@id([eventId, userId])
-
-  @@map("event_recipients")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   //
   // Indexes
   //
 
+  @@id([eventId, userId])
   @@index([userId, readAt, createdAt(sort: Desc)])
-
   @@index([eventId])
-
   @@index([userId, eventId])
+  @@map("event_recipients")
+}
+
+model Dispute {
+
+  id String @id @default(uuid()) @db.Uuid
+
+  milestoneId String @unique @db.Uuid
+
+  createdById String @db.Uuid
+
+  status DisputeStatus
+
+  origin DisputeOrigin
+
+  reason String @db.Text
+
+  requestedResolution String? @db.Text
+
+  holdStartedAt DateTime
+
+  resolvedAt DateTime?
+
+  closedAt DateTime?
+
+  negotiationCount Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  holdDurationSeconds Int @default(0)
+
+  milestone Milestone @relation(fields:[milestoneId],references:[id],onDelete:Cascade)
+
+  createdBy User @relation(fields:[createdById],references:[id],onDelete:Restrict)
+
+  result DisputeResult?
+}
+
+model Negotiation {
+
+  id String @id @default(uuid()) @db.Uuid
+
+  projectId String @db.Uuid
+
+  milestoneId String @db.Uuid
+
+  negotiationNumber Int
+
+  initiatedById String @db.Uuid
+
+  initiatedBy User @relation( "NegotiationInitiatedBy", fields: [initiatedById], references: [id], onDelete: Restrict )
+
+  proposedSettlement SettlementProposal
+
+  proposedPercentage Int
+
+  proposedAmount Decimal? @db.Decimal(18,2)
+
+  reason String @db.Text
+
+  status NegotiationStatus
+
+  waitingStatus PartyResponseStatus
+
+  respondedAt DateTime?
+
+  responseDeadline DateTime
+
+  actionRequest ActionRequest?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  project Project @relation( fields: [projectId], references: [id], onDelete: Cascade )
+
+  milestone Milestone @relation( fields: [milestoneId], references: [id], onDelete: Cascade )
+
+  @@unique([ milestoneId, negotiationNumber ])
+
+  @@index([projectId])
+
+  @@index([milestoneId])
+
+  @@index([status])
+
+  @@index([responseDeadline])
+
+  @@map("negotiations")
+}
+
+model DisputeResult {
+
+  id String @id @default(uuid()) @db.Uuid
+
+  disputeId String @unique @db.Uuid
+
+  decision DisputeDecision
+
+  explanation String @db.Text
+
+  resultPublishedAt DateTime
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  actionRequest ActionRequest?
+
+  @@map("dispute_results")
+}
+
+model ActionRequest {
+
+  id String @id @default(uuid()) @db.Uuid
+
+  type ActionRequestType
+
+  status ActionRequestStatus @default(PENDING)
+
+  deadline DateTime
+
+  completedAt DateTime?
+
+  disputeResultId String? @unique @db.Uuid
+
+  disputeResult DisputeResult? @relation( fields:[disputeResultId], references:[id], onDelete:Cascade )
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  negotiationId String? @unique @db.Uuid
+
+  negotiation Negotiation? @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+
+  participants ActionRequestParticipant[]
+
+  @@index([status])
+
+  @@index([deadline])
+}
+
+model ActionRequestParticipant {
+
+  id String @id @default(uuid()) @db.Uuid
+
+  actionRequestId String @db.Uuid
+
+  userId String @db.Uuid
+
+  decision ActionDecision?
+
+  status ActionParticipantStatus @default(PENDING)
+
+  respondedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  actionRequest ActionRequest @relation(fields: [actionRequestId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([actionRequestId, userId])
+
+  @@index([userId])
+
+  @@index([status])
 }

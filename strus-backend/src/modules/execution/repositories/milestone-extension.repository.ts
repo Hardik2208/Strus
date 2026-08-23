@@ -32,4 +32,19 @@ export class MilestoneExtensionRepository {
       },
     });
   }
+
+  static async findLatestApproved(
+  milestoneId: string
+) {
+  return prisma.milestoneExtension.findFirst({
+    where: {
+      milestoneId,
+      status: "APPROVED",
+    },
+
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+}
 }

@@ -10,48 +10,100 @@ import { logger } from "./core/logger/index.js";
 
 import { initializeQueues } from "./core/queues/index.js";
 
-import { ExecutionScheduler } from "./modules/execution/jobs/execution.scheduler.js";
+import { EventScheduler } from "../src/modules/execution/jobs/execution.scheduler.js";
 
 async function bootstrap() {
   try {
+
+    // ==================================================
     // Connect Redis
+    // ==================================================
+
     await connectRedis();
 
-    // Initialize BullMQ queues & workers
+    // ==================================================
+    // Initialize BullMQ Queues & Workers
+    // ==================================================
+
     initializeQueues();
 
-    const httpServer = createServer(app);
+    // ==================================================
+    // Create HTTP Server
+    // ==================================================
 
-    initializeSocket(httpServer);
+    const httpServer =
+      createServer(app);
 
-    ExecutionScheduler.start();
+    // ==================================================
+    // Initialize Socket.IO
+    // ==================================================
+
+    initializeSocket(
+      httpServer
+    );
+
+    // ==================================================
+    // Start Centralized Event Scheduler
+    // ==================================================
+
+    EventScheduler.start();
+
+    // ==================================================
+    // Start HTTP Server
+    // ==================================================
 
     httpServer.listen(
       env.PORT,
       env.HOST,
       () => {
+
         logger.info(
           `🚀 ${env.APP_NAME} running at http://${env.HOST}:${env.PORT}`
         );
+
       }
     );
 
+    // ==================================================
+    // Graceful Shutdown
+    // ==================================================
+
     const shutdown = async () => {
-      logger.info("Shutting down...");
 
-      ExecutionScheduler.stop();
+      logger.info(
+        "Shutting down..."
+      );
 
-      httpServer.close(() => {
-        process.exit(0);
-      });
+      // Stop centralized scheduler
+      EventScheduler.stop();
+
+      // Close HTTP server
+      httpServer.close(
+        () => {
+          process.exit(0);
+        }
+      );
+
     };
 
-    process.on("SIGINT", shutdown);
-    process.on("SIGTERM", shutdown);
+    process.on(
+      "SIGINT",
+      shutdown
+    );
+
+    process.on(
+      "SIGTERM",
+      shutdown
+    );
+
   } catch (error) {
-    logger.error(error);
+
+    logger.error(
+      error
+    );
 
     process.exit(1);
+
   }
 }
 

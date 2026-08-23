@@ -56,6 +56,66 @@ export enum NotificationJobType {
   EXTENSION_GRANTED = "EXTENSION_GRANTED",
 
   MILESTONE_COMPLETED = "MILESTONE_COMPLETED",
+
+// ======================================================
+// Negotiation
+// ======================================================
+
+NEGOTIATION_CREATED = "NEGOTIATION_CREATED",
+
+NEGOTIATION_ACCEPTED = "NEGOTIATION_ACCEPTED",
+
+NEGOTIATION_DECLINED = "NEGOTIATION_DECLINED",
+
+NEGOTIATION_EXPIRED = "NEGOTIATION_EXPIRED",
+
+// ======================================================
+// Dispute
+// ======================================================
+
+DISPUTE_CREATED = "DISPUTE_CREATED",
+
+DISPUTE_RESOLUTION_PROPOSED = "DISPUTE_RESOLUTION_PROPOSED",
+
+DISPUTE_RESOLVED = "DISPUTE_RESOLVED",
+
+DISPUTE_CLOSED = "DISPUTE_CLOSED",
+
+ACTION_REQUEST_CREATED =
+  "ACTION_REQUEST_CREATED",
+
+ACTION_REQUEST_RESPONDED =
+  "ACTION_REQUEST_RESPONDED",
+
+ACTION_REQUEST_EXPIRED =
+  "ACTION_REQUEST_EXPIRED",
+}
+// ======================================================
+// Action Request
+// ======================================================
+
+export interface ActionRequestCreatedJobData {
+
+  actionRequestId: string;
+
+  createdById: string;
+
+}
+
+export interface ActionRequestRespondedJobData {
+
+  actionRequestId: string;
+
+  createdById: string;
+
+}
+
+export interface ActionRequestExpiredJobData {
+
+  actionRequestId: string;
+
+  createdById: string;
+
 }
 
 export interface WorkspaceMemberLeftJobData {
@@ -273,18 +333,6 @@ export interface ProjectAssetSharedPayload {
   createdById: string;
   projectId: string;
   projectAssetId: string;
-}export interface MilestoneStartedPayload {
-  createdById: string;
-  projectId: string;
-  milestoneId: string;
-  agreementParticipantId: string;
-}
-
-export interface MilestoneCompletedPayload {
-  createdById: string;
-  projectId: string;
-  milestoneId: string;
-  agreementParticipantId: string;
 }
 
 export interface MilestoneStartedPayload {
@@ -323,6 +371,106 @@ export interface ExtensionGrantedPayload {
   milestoneId: string;
   extensionId: string;
   agreementParticipantId: string;
+}
+
+// ======================================================
+// Dispute
+// ======================================================
+
+/**
+ * Dispute Created
+ */
+export interface DisputeCreatedJobData {
+
+  createdById: string;
+
+  projectId: string;
+
+  disputeId: string;
+
+}
+
+/**
+ * Resolution Proposed
+ */
+export interface DisputeResolutionProposedJobData {
+
+  createdById: string;
+
+  projectId: string;
+
+  disputeId: string;
+
+}
+
+// ==================================================
+// Negotiation Notification Jobs
+// ==================================================
+
+export interface NegotiationCreatedJobData {
+
+  negotiationId: string;
+
+  projectId: string;
+
+  createdById: string;
+
+}
+
+export interface NegotiationAcceptedJobData {
+
+  negotiationId: string;
+
+  projectId: string;
+
+  createdById: string;
+
+}
+
+export interface NegotiationDeclinedJobData {
+
+  negotiationId: string;
+
+  projectId: string;
+
+  createdById: string;
+
+}
+
+export interface NegotiationExpiredJobData {
+
+  negotiationId: string;
+
+  projectId: string;
+
+  createdById: string;
+
+}
+
+/**
+ * Dispute Resolved
+ */
+export interface DisputeResolvedJobData {
+
+  createdById: string;
+
+  projectId: string;
+
+  disputeId: string;
+
+}
+
+/**
+ * Dispute Closed
+ */
+export interface DisputeClosedJobData {
+
+  createdById: string;
+
+  projectId: string;
+
+  disputeId: string;
+
 }
 
 /**
@@ -393,10 +541,87 @@ export interface NotificationPayloadMap {
 
 [NotificationJobType.AGREEMENT_PROFESSIONAL_REMOVED]:
   AgreementProfessionalRemovedJobData;
+
+// ======================================================
+// Execution
+// ======================================================
+
+[NotificationJobType.EXECUTION_PLAN_CREATED]:
+  ExecutionPlanCreatedPayload;
+
+[NotificationJobType.EXECUTION_PLAN_UPDATED]:
+  ExecutionPlanUpdatedPayload;
+
+[NotificationJobType.PROJECT_ASSET_SHARED]:
+  ProjectAssetSharedPayload;
+
+[NotificationJobType.MILESTONE_STARTED]:
+  MilestoneStartedPayload;
+
+[NotificationJobType.SUBMISSION_CREATED]:
+  SubmissionCreatedPayload;
+
+[NotificationJobType.REVISION_REQUESTED]:
+  RevisionRequestedPayload;
+
+[NotificationJobType.EXTENSION_GRANTED]:
+  ExtensionGrantedPayload;
+
+[NotificationJobType.MILESTONE_COMPLETED]:
+  MilestoneCompletedPayload;
+
+// ======================================================
+// Negotiation
+// ======================================================
+
+[NotificationJobType.NEGOTIATION_CREATED]:
+  NegotiationCreatedJobData;
+
+[NotificationJobType.NEGOTIATION_ACCEPTED]:
+  NegotiationAcceptedJobData;
+
+[NotificationJobType.NEGOTIATION_DECLINED]:
+  NegotiationDeclinedJobData;
+
+[NotificationJobType.NEGOTIATION_EXPIRED]:
+  NegotiationExpiredJobData;
+
+// ======================================================
+// Dispute
+// ======================================================
+
+[NotificationJobType.DISPUTE_CREATED]:
+  DisputeCreatedJobData;
+
+[NotificationJobType.DISPUTE_RESOLUTION_PROPOSED]:
+  DisputeResolutionProposedJobData;
+
+[NotificationJobType.DISPUTE_RESOLVED]:
+  DisputeResolvedJobData;
+
+[NotificationJobType.DISPUTE_CLOSED]:
+  DisputeClosedJobData;
+
+// ======================================================
+// Action Request
+// ======================================================
+
+[NotificationJobType.ACTION_REQUEST_CREATED]:
+  ActionRequestCreatedJobData;
+
+[NotificationJobType.ACTION_REQUEST_RESPONDED]:
+  ActionRequestRespondedJobData;
+
+[NotificationJobType.ACTION_REQUEST_EXPIRED]:
+  ActionRequestExpiredJobData;
+
+
 }
+
 /**
  * Notification queue job.
  */
+
 export type NotificationJob =
 
   // ======================================================
@@ -525,4 +750,74 @@ export type NotificationJob =
   | {
       type: NotificationJobType.MILESTONE_COMPLETED;
       payload: MilestoneCompletedPayload;
-    };
+    }
+    
+    // ======================================================
+    // Negotiation
+    // ======================================================
+
+  | {
+      type:NotificationJobType.NEGOTIATION_CREATED;
+
+      payload:NegotiationCreatedJobData;
+    }
+
+  | {
+      type:NotificationJobType.NEGOTIATION_ACCEPTED;
+
+      payload:NegotiationAcceptedJobData;
+    }
+
+  | {
+      type:NotificationJobType.NEGOTIATION_DECLINED;
+
+      payload:NegotiationDeclinedJobData;
+    }
+
+  | {
+      type:NotificationJobType.NEGOTIATION_EXPIRED;
+
+      payload:NegotiationExpiredJobData;
+    }
+
+// ======================================================
+// Dispute
+// ======================================================
+
+  | {
+      type:NotificationJobType.DISPUTE_CREATED;
+      payload:DisputeCreatedJobData;
+    }
+
+  | {
+      type:NotificationJobType.DISPUTE_RESOLUTION_PROPOSED;
+      payload:DisputeResolutionProposedJobData;
+    }
+
+  | {
+      type:NotificationJobType.DISPUTE_RESOLVED;
+      payload:DisputeResolvedJobData;
+    }
+
+  | {
+      type:NotificationJobType.DISPUTE_CLOSED;
+      payload:DisputeClosedJobData;
+    }
+  // ======================================================
+// Action Request
+// ======================================================
+
+| {
+    type: NotificationJobType.ACTION_REQUEST_CREATED;
+    payload: ActionRequestCreatedJobData;
+  }
+
+| {
+    type: NotificationJobType.ACTION_REQUEST_RESPONDED;
+    payload: ActionRequestRespondedJobData;
+  }
+
+| {
+    type: NotificationJobType.ACTION_REQUEST_EXPIRED;
+    payload: ActionRequestExpiredJobData;
+  };

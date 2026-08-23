@@ -1,0 +1,1 @@
+export { disputeRoutes } from "./routes/dispute.routes.js";
