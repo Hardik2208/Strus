@@ -2983,3 +2983,497 @@ The audit endpoint serves as the primary source for:
 * Compliance and accountability tracking
 
 All audit records are created transactionally alongside the corresponding workspace operation, ensuring that every successful state change has a matching immutable audit record.
+
+
+####################################################################################################################
+
+Workspace Module — Pending Workspace Invitations
+1. Overview
+
+The Workspace module was extended with a user-scoped pending invitation API.
+
+The purpose of this API is to allow an authenticated user to retrieve all currently actionable workspace invitations addressed to them.
+
+This is required for the Client Dashboard, where workspace invitations must remain retrievable even if the user was offline when the real-time Socket.IO invitation event was emitted.
+
+The underlying WorkspaceInvitation model already contains the required recipient, status, expiration, workspace, and inviter relationships.
+
+2. Business Requirement
+
+Workspace invitations are sent from one workspace member to another user.
+
+The invitation lifecycle is:
+
+PENDING
+   │
+   ├── ACCEPTED
+   │
+   ├── DECLINED
+   │
+   ├── CANCELLED
+   │
+   └── EXPIRED
+
+The Client Dashboard must display only invitations that are currently actionable.
+
+Therefore, an invitation is considered pending for dashboard retrieval when:
+
+invitedUserId = authenticated user
+AND
+status = PENDING
+AND
+expiresAt > current time
+
+This prevents stale or already-processed invitations from appearing in the dashboard.
+
+3. API Endpoint
+Get Pending Invitations for Authenticated User
+GET /api/v1/workspaces/invitations/pending
+Authentication
+
+Required:
+
+Authorization: Bearer <ACCESS_TOKEN>
+
+The user ID is extracted from the authenticated JWT.
+
+The client does not provide a userId parameter.
+
+This prevents users from attempting to retrieve another user's invitations.
+
+4. Request
+Headers
+Authorization: Bearer <ACCESS_TOKEN>
+
+No request body is required.
+
+No query parameters are required.
+
+Example
+curl --location \
+'http://localhost:3000/api/v1/workspaces/invitations/pending' \
+--header 'Authorization: Bearer <ACCESS_TOKEN>'
+5. Successful Response
+{
+  "success": true,
+  "data": {
+    "invitations": [],
+    "count": 0
+  }
+}
+
+When invitations exist:
+
+{
+  "success": true,
+  "data": {
+    "invitations": [
+      {
+        "id": "6d35a460-626f-4baa-9d25-f9182c59f0f3",
+        "status": "PENDING",
+        "expiresAt": "2026-07-12T17:22:20.103Z",
+        "createdAt": "2026-07-05T17:22:20.104Z",
+        "workspace": {
+          "id": "275b5163-bd38-4546-9887-a19332362cc3",
+          "name": "Example Workspace",
+          "slug": "example-workspace",
+          "description": "Workspace description",
+          "workspaceType": "TEAM",
+          "owner": {
+            "id": "bd2f55ec-2276-4c12-a0ae-e90f7e60b4a7",
+            "username": "hardik2208",
+            "firstName": "Hardik",
+            "lastName": "Raghuvanshi",
+            "avatarUrl": null
+          }
+        },
+        "invitedBy": {
+          "id": "bd2f55ec-2276-4c12-a0ae-e90f7e60b4a7",
+          "username": "hardik2208",
+          "firstName": "Hardik",
+          "lastName": "Raghuvanshi",
+          "avatarUrl": null
+        }
+      }
+    ],
+    "count": 1
+  }
+}
+6. Repository Layer
+Location
+src/modules/workspace/repositories/workspace.repository.ts
+
+The repository performs the database lookup using the authenticated user's ID.
+
+Conceptually:
+
+findMany({
+  where: {
+    invitedUserId: userId,
+    status: PENDING,
+    expiresAt: {
+      gt: new Date()
+    }
+  }
+})
+
+The query also retrieves the associated:
+
+Workspace
+Workspace owner
+Inviting user
+Invitation metadata
+
+The database schema contains indexes on invitedUserId and status, supporting this user-scoped lookup efficiently.
+
+7. Service Layer
+Location
+src/modules/workspace/services/workspace.service.ts
+
+The service exposes:
+
+getPendingInvitationsForUser(userId)
+
+Responsibilities:
+
+Receive the authenticated user's ID.
+Request pending invitations from the repository.
+Transform database records into API-safe response objects.
+Return only actionable invitations.
+
+The service does not accept a user ID supplied by the client.
+
+8. Controller Layer
+Location
+src/modules/workspace/controllers/workspace.controller.ts
+
+The controller obtains the user from authentication:
+
+const userId = req.user.id;
+
+Then:
+
+const invitations =
+  await WorkspaceService.getPendingInvitationsForUser(
+    userId
+  );
+
+Response:
+
+{
+  "success": true,
+  "data": {
+    "invitations": [...],
+    "count": 1
+  }
+}
+9. Route
+Location
+src/modules/workspace/routes/workspace.routes.ts
+router.get(
+  "/invitations/pending",
+  authenticate,
+  WorkspaceController.getPendingInvitations
+);
+Route Ordering
+
+This route must appear before:
+
+router.get(
+  "/:workspaceId",
+  authenticate,
+  WorkspaceController.getById
+);
+
+Otherwise:
+
+/invitations/pending
+
+can be interpreted as:
+
+/:workspaceId
+
+and "invitations" would incorrectly be treated as a workspace ID.
+
+10. Security
+
+The endpoint is protected by the existing authentication middleware:
+
+authenticate
+
+The authenticated JWT determines:
+
+req.user.id
+
+The database query then uses:
+
+invitedUserId = req.user.id
+
+Therefore a user cannot retrieve another user's invitations by manipulating the URL.
+
+There is deliberately no endpoint such as:
+
+GET /workspaces/invitations/pending/:userId
+11. Dashboard Integration
+
+Workspace invitations belong in the Client Dashboard because workspaces are part of the client's project-management environment.
+
+The dashboard should call:
+
+GET /api/v1/workspaces/invitations/pending
+
+when the dashboard initializes.
+
+Conceptual flow:
+
+Client Dashboard Opens
+        │
+        ▼
+GET /workspaces/invitations/pending
+        │
+        ▼
+Backend authenticates user
+        │
+        ▼
+Query WorkspaceInvitation
+        │
+        ▼
+Return pending invitations
+        │
+        ▼
+Render invitation cards
+
+The invitation card should provide:
+
+Workspace name
+Workspace description
+Workspace owner
+Invited by
+Invitation creation date
+Expiration date
+Accept action
+Decline action
+12. Socket + REST Architecture
+
+This endpoint is particularly important because Socket.IO is not the source of truth.
+
+The architecture is:
+
+                 PostgreSQL
+                     │
+                     │ source of truth
+                     ▼
+          WorkspaceInvitation
+                     │
+          ┌──────────┴──────────┐
+          │                     │
+          ▼                     ▼
+       REST API             Socket.IO
+          │                     │
+          ▼                     ▼
+ Dashboard retrieval      Real-time event
+Socket.IO
+
+Used for:
+
+Immediate notification
+REST API
+
+Used for:
+
+Reliable state retrieval
+
+If the user is offline when:
+
+INVITATION_CREATED
+
+is emitted, the invitation is not lost.
+
+When the user later opens the Client Dashboard:
+
+GET /api/v1/workspaces/invitations/pending
+
+retrieves it from PostgreSQL.
+
+13. Reconnection Behaviour
+
+The frontend should not depend on the socket event being received.
+
+Recommended flow:
+
+User opens Client Dashboard
+          │
+          ├── REST → fetch pending invitations
+          │
+          └── Socket → establish/re-establish connection
+
+After socket reconnection, the frontend may refresh pending invitations again if required.
+
+The important rule is:
+
+Socket events notify; REST retrieves authoritative state.
+
+14. Expiration Handling
+
+The endpoint filters:
+
+expiresAt: {
+  gt: new Date()
+}
+
+Therefore expired invitations are not returned as actionable invitations.
+
+For example:
+
+Invitation A
+status = PENDING
+expiresAt = future
+→ returned
+
+Invitation B
+status = PENDING
+expiresAt = past
+→ not returned
+
+Invitation C
+status = ACCEPTED
+expiresAt = future
+→ not returned
+
+Invitation D
+status = DECLINED
+expiresAt = future
+→ not returned
+
+The persisted invitation remains in the database for historical/audit purposes; it simply does not appear in the pending dashboard result.
+
+15. Caching Decision
+
+Redis caching is not currently required for this endpoint.
+
+The invitation query is:
+
+user-scoped
+indexed
+lightweight
+highly mutable
+
+Caching would introduce invalidation requirements for:
+
+Invitation created
+Invitation accepted
+Invitation declined
+Invitation cancelled
+Invitation expired
+
+PostgreSQL remains the authoritative source.
+
+If future profiling demonstrates a real performance requirement, Redis can be introduced with explicit invalidation.
+
+16. Pagination
+
+The current endpoint intentionally returns the complete set of pending invitations for the authenticated user.
+
+This is reasonable because pending invitations are expected to be a relatively small actionable collection.
+
+Unlike workspace members or message history, this endpoint is not expected to contain millions of records.
+
+If product requirements later allow very large invitation volumes, cursor pagination can be introduced without changing the core business model.
+
+17. Error Handling
+Missing/invalid access token
+
+Handled by:
+
+authenticate
+Server/database failure
+
+Handled through the existing controller:
+
+catch (error) {
+  next(error);
+}
+
+The endpoint does not expose database or Prisma internals to the client.
+
+18. Database Relationship
+
+The invitation is connected to:
+
+User
+   │
+   │ receivedWorkspaceInvitations
+   ▼
+WorkspaceInvitation
+   │
+   ├── Workspace
+   │
+   ├── invitedByUser
+   │
+   └── invitedUser
+
+Your schema explicitly defines both sender and recipient relationships:
+
+sentWorkspaceInvitations
+receivedWorkspaceInvitations
+
+and WorkspaceInvitation stores:
+
+workspaceId
+invitedByUserId
+invitedUserId
+status
+expiresAt
+createdAt
+updatedAt
+
+19. Testing
+
+The implemented endpoint was tested with:
+
+curl --location \
+'http://localhost:3000/api/v1/workspaces/invitations/pending' \
+--header 'Authorization: Bearer <ACCESS_TOKEN>'
+
+The current test returned:
+
+{
+  "success": true,
+  "data": {
+    "invitations": [],
+    "count": 0
+  }
+}
+
+This confirms:
+
+Route is registered.
+Authentication works.
+Controller is reachable.
+Service executes.
+Repository query executes.
+Response structure is valid.
+No pending invitations currently exist for that authenticated user.
+20. Final Architecture
+
+The completed workspace invitation retrieval system is now:
+
+Workspace Owner
+      │
+      │ Create Invitation
+      ▼
+WorkspaceInvitation
+      │
+      ├──────────────► PostgreSQL
+      │                    │
+      │                    │ authoritative state
+      │                    ▼
+      │              Pending Invitation API
+      │                    │
+      │                    ▼
+      │              Client Dashboard
+      │
+      └──────────────► Socket.IO
+                           │
+                           ▼
+                    Real-time notification

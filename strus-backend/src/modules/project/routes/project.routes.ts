@@ -62,4 +62,10 @@ router.patch(
   ProjectController.transfer
 );
 
+router.get(
+  "/me",
+  authenticate,
+  ProjectController.getProfessionalProjects
+);
+
 export default router;

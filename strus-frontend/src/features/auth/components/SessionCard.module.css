@@ -1,0 +1,29 @@
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-16);
+  background-color: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.header {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.details {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+.status {
+  margin-top: var(--space-8);
+  font-size: var(--text-sm);
+}
+.active {
+  color: var(--color-success);
+  font-weight: 500;
+}
+.action {
+  margin-top: var(--space-8);
+  align-self: flex-start;
+}

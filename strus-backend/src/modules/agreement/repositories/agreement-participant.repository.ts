@@ -8,6 +8,7 @@ import {
 } from "../../../generated/prisma/enums.js";
 
 import { prisma } from "../../../core/database/prisma.js";
+import type { ListPendingAgreementInvitationsDto } from "../dtos/list-pending-agreement-invitations.dto.js";
 
 export class AgreementParticipantRepository {
   // ==================================================
@@ -232,4 +233,90 @@ static async findForConversationSync(
     },
   });
 }
+
+  static async findPendingInvitationsByUserId(
+    userId: string,
+    query: ListPendingAgreementInvitationsDto
+  ) {
+    const where: Prisma.AgreementParticipantWhereInput = {
+      userId,
+
+      role: "PROFESSIONAL",
+
+      invitationStatus: "PENDING",
+    };
+
+    const [participants, total] =
+      await prisma.$transaction([
+        prisma.agreementParticipant.findMany({
+          where,
+
+          include: {
+            agreement: {
+              include: {
+                project: {
+                  select: {
+                    id: true,
+                    title: true,
+                    description: true,
+                    status: true,
+                    setupStage: true,
+                    workspaceId: true,
+                  },
+                },
+
+                createdBy: {
+                  select: {
+                    id: true,
+
+                    profile: {
+                      select: {
+                        username: true,
+                        firstName: true,
+                        lastName: true,
+                        avatarUrl: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+
+            user: {
+              select: {
+                id: true,
+
+                profile: {
+                  select: {
+                    username: true,
+                    firstName: true,
+                    lastName: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+            },
+          },
+
+          skip:
+            (query.page - 1) *
+            query.limit,
+
+          take: query.limit,
+
+          orderBy: {
+            invitedAt: "desc",
+          },
+        }),
+
+        prisma.agreementParticipant.count({
+          where,
+        }),
+      ]);
+
+    return {
+      participants,
+      total,
+    };
+  }
 }

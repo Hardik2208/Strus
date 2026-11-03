@@ -10,7 +10,7 @@ import { logger } from "./core/logger/index.js";
 
 import { initializeQueues } from "./core/queues/index.js";
 
-import { EventScheduler } from "../src/modules/execution/jobs/execution.scheduler.js";
+import { EventScheduler } from "./modules/execution/jobs/execution.scheduler.js";
 
 async function bootstrap() {
   try {

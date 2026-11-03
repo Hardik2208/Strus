@@ -78,4 +78,10 @@ router.patch(
   AgreementParticipantController.withdrawInvitation
 );
 
+router.get(
+  "/invitations/pending",
+  authenticate,
+  AgreementParticipantController
+    .getPendingInvitations
+);
 export default router;

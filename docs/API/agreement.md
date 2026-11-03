@@ -4297,3 +4297,735 @@ The Agreement Module is considered production-ready when
 - All automated and manual test cases pass successfully.
 
 ####################################################################################################################
+
+# Pending Agreement Invitations API
+
+## Overview
+
+The Pending Agreement Invitations API allows an authenticated user, specifically a professional, to retrieve all agreement invitations that are currently waiting for their response.
+
+This API is required in addition to the Socket.IO invitation event.
+
+Socket.IO provides real-time notification when an invitation is created, while this API provides the persistent source of truth when the professional:
+
+- opens the application later,
+- refreshes the page,
+- reconnects after being offline,
+- misses a Socket.IO event,
+- or needs to retrieve all currently pending invitations.
+
+The API is user-scoped. The authenticated user's ID is taken from the authentication context and must never be supplied by the client.
+
+---
+
+# Endpoint
+
+```http
+GET /api/v1/agreement/invitations/pending
+Authentication
+Authorization: Bearer <accessToken>
+Query Parameters
+Parameter	Type	Required	Default	Description
+page	integer	No	1	Page number
+limit	integer	No	20	Number of invitations per page
+Example
+GET /api/v1/agreement/invitations/pending?page=1&limit=20
+Purpose
+
+This endpoint answers:
+
+"Which agreement invitations are currently pending for the authenticated professional?"
+
+It does not require a projectId or agreementId.
+
+The backend determines the target user from:
+
+req.user.id
+
+The query is restricted to:
+
+userId = authenticatedUserId
+role = PROFESSIONAL
+invitationStatus = PENDING
+Data Model
+
+The API uses the existing AgreementParticipant model.
+
+model AgreementParticipant {
+  id               String                    @id @default(uuid()) @db.Uuid
+  agreementId      String                    @db.Uuid
+  userId           String                    @db.Uuid
+  role             AgreementParticipantRole
+  invitationStatus AgreementInvitationStatus @default(PENDING)
+  invitedAt        DateTime                  @default(now())
+  respondedAt      DateTime?
+  joinedAt         DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  agreement Agreement @relation(
+    fields: [agreementId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  user User @relation(
+    fields: [userId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  @@index([agreementId, createdAt(sort: Desc)])
+  @@index([agreementId, userId, respondedAt])
+  @@index([userId])
+  @@index([agreementId, invitationStatus])
+  @@index([agreementId, role])
+  @@index([userId, invitationStatus])
+}
+
+The existing:
+
+@@index([userId, invitationStatus])
+
+is appropriate for this API because the primary lookup conditions are the authenticated user's ID and the invitation status.
+
+Business Rules
+1. Authentication is mandatory
+
+Only authenticated users can access this endpoint.
+
+The user ID must come from:
+
+req.user.id
+
+The frontend must not send:
+
+{
+  "userId": "..."
+}
+
+The backend must never trust a user ID supplied by the frontend for this endpoint.
+
+2. Only the authenticated user's invitations are returned
+
+If the authenticated user is:
+
+USER_A
+
+the query must only return:
+
+AgreementParticipant.userId = USER_A
+
+Invitations belonging to other users must never be returned.
+
+3. Only professional invitations are returned
+
+The endpoint is intended for professionals joining projects.
+
+Therefore:
+
+role = PROFESSIONAL
+
+must be applied.
+
+Client participant records must not appear in this response.
+
+4. Only pending invitations are returned
+
+The endpoint must filter:
+
+invitationStatus = PENDING
+
+Therefore the following statuses are excluded:
+
+ACCEPTED
+DECLINED
+WITHDRAWN
+5. Accepted invitations disappear from pending results
+
+Once the professional accepts an invitation:
+
+PENDING → ACCEPTED
+
+the invitation must no longer be returned by:
+
+GET /api/v1/agreement/invitations/pending
+6. Declined invitations disappear from pending results
+
+When the professional declines:
+
+PENDING → DECLINED
+
+the invitation must no longer appear in the pending list.
+
+7. Withdrawn invitations disappear from pending results
+
+When the client withdraws:
+
+PENDING → WITHDRAWN
+
+the invitation must no longer appear in the professional's pending list.
+
+8. Removed participants do not appear
+
+If the participant is removed from the agreement, it must not be presented as an active pending invitation.
+
+9. Socket.IO is not the source of truth
+
+Socket.IO is only responsible for realtime delivery.
+
+The database remains the source of truth.
+
+Invitation flow
+Client invites professional
+        │
+        ▼
+AgreementParticipant created
+        │
+        │ invitationStatus = PENDING
+        ▼
+Socket.IO invitation event
+        │
+        ▼
+Professional receives realtime notification
+        │
+        ▼
+Professional opens invitation
+
+If the professional was offline:
+
+Professional offline
+        │
+        ▼
+Socket event missed
+        │
+        ▼
+Professional opens application
+        │
+        ▼
+GET /api/v1/agreement/invitations/pending
+        │
+        ▼
+Pending invitation retrieved
+
+This prevents invitation loss caused by disconnected clients.
+
+Request
+curl --request GET \
+  --url "http://localhost:3000/api/v1/agreement/invitations/pending?page=1&limit=20" \
+  --header "Authorization: Bearer <PROFESSIONAL_ACCESS_TOKEN>"
+Successful Response
+{
+  "success": true,
+  "data": {
+    "invitations": [
+      {
+        "id": "participant-id",
+        "role": "PROFESSIONAL",
+        "invitationStatus": "PENDING",
+        "invitedAt": "2026-08-26T12:00:00.000Z",
+        "respondedAt": null,
+        "joinedAt": null,
+
+        "agreement": {
+          "id": "agreement-id",
+          "title": "Backend Development Agreement",
+          "description": "Backend APIs",
+          "scope": "Build backend APIs",
+          "outOfScope": null,
+          "budget": "30000",
+          "expectedDuration": 45
+        },
+
+        "project": {
+          "id": "project-id",
+          "title": "Stripe Internship Backend",
+          "description": "Testing Agreement Module",
+          "status": "DRAFT",
+          "setupStage": "AGREEMENT_COMPLETED",
+          "workspaceId": "workspace-id"
+        },
+
+        "invitedBy": {
+          "id": "client-user-id",
+          "username": "hardik2208",
+          "firstName": "Hardik",
+          "lastName": "Raghuvanshi",
+          "avatarUrl": null
+        }
+      }
+    ],
+
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 1,
+      "totalPages": 1,
+      "hasNext": false
+    }
+  }
+}
+Response Fields
+Invitation
+Field	Description
+id	Agreement participant/invitation ID
+role	Participant role
+invitationStatus	Current invitation status
+invitedAt	Time at which the invitation was created
+respondedAt	Response timestamp; null while pending
+joinedAt	Project joining timestamp; null while pending
+Agreement
+
+The agreement information allows the professional to understand what they are being invited to.
+
+Field	Description
+id	Agreement ID
+title	Agreement title
+description	Agreement description
+scope	Work included in the agreement
+outOfScope	Work explicitly excluded
+budget	Agreement budget
+expectedDuration	Expected duration
+Project
+
+The project information identifies the project associated with the agreement.
+
+Field	Description
+id	Project ID
+title	Project title
+description	Project description
+status	Current project status
+setupStage	Current project setup stage
+workspaceId	Workspace containing the project
+Inviter
+
+The inviter information identifies the client who created the agreement.
+
+{
+  "id": "client-user-id",
+  "username": "hardik2208",
+  "firstName": "Hardik",
+  "lastName": "Raghuvanshi",
+  "avatarUrl": null
+}
+
+The frontend can use this information to display:
+
+Hardik Raghuvanshi
+@hardik2208
+
+along with the avatar where available.
+
+Pagination
+
+The endpoint uses standard page-based pagination.
+
+Example
+GET /api/v1/agreement/invitations/pending?page=2&limit=10
+
+Response:
+
+{
+  "pagination": {
+    "page": 2,
+    "limit": 10,
+    "total": 25,
+    "totalPages": 3,
+    "hasNext": true
+  }
+}
+
+Pagination calculation:
+
+totalPages = Math.ceil(total / limit);
+hasNext = page < totalPages;
+Repository Query
+
+The repository should use the authenticated user ID and pending status:
+
+const where: Prisma.AgreementParticipantWhereInput = {
+  userId,
+
+  role: "PROFESSIONAL",
+
+  invitationStatus: "PENDING",
+};
+
+The records should be ordered by newest invitation first:
+
+orderBy: {
+  invitedAt: "desc",
+}
+
+Pagination:
+
+skip: (query.page - 1) * query.limit,
+take: query.limit,
+
+The query should retrieve the required agreement/project/inviter information using Prisma relations rather than making unnecessary individual queries.
+
+Service Layer
+
+The service should remain responsible for the application-level operation.
+
+static async getPendingInvitations(
+  userId: string,
+  query: ListPendingAgreementInvitationsDto
+) {
+  return AgreementParticipantRepository
+    .findPendingInvitationsByUserId(
+      userId,
+      query
+    );
+}
+
+The controller should not directly query Prisma.
+
+The flow must remain:
+
+Controller
+    ↓
+Service
+    ↓
+Repository
+    ↓
+Prisma
+    ↓
+PostgreSQL
+Controller Flow
+Request
+   │
+   ▼
+Authentication middleware
+   │
+   ▼
+req.user.id
+   │
+   ▼
+Parse pagination query
+   │
+   ▼
+AgreementParticipantService
+   │
+   ▼
+AgreementParticipantRepository
+   │
+   ▼
+Filter:
+   userId = req.user.id
+   role = PROFESSIONAL
+   invitationStatus = PENDING
+   │
+   ▼
+Fetch agreement/project/inviter
+   │
+   ▼
+Mapper
+   │
+   ▼
+Paginated response
+Frontend Usage
+
+The frontend should call this endpoint when the professional needs to load their pending invitations.
+
+Recommended locations include:
+
+Professional Dashboard
+        │
+        ├── Pending Invitations
+        │
+        └── Notifications
+
+A dedicated page may display:
+
+Pending Invitations
+
+┌────────────────────────────────────────────┐
+│ Backend Development Agreement              │
+│ Stripe Internship Backend                  │
+│                                            │
+│ Invited by Hardik Raghuvanshi              │
+│ Budget: ₹30,000                            │
+│ Duration: 45 days                          │
+│                                            │
+│ [View Agreement]  [Accept] [Decline]       │
+└────────────────────────────────────────────┘
+Realtime + REST Integration
+
+The frontend should combine the REST API with Socket.IO.
+
+Initial application load
+GET /agreement/invitations/pending
+
+This establishes the current state.
+
+New invitation while online
+Socket.IO
+    ↓
+AGREEMENT_INVITATION_CREATED
+    ↓
+Invalidate pending invitations query
+    ↓
+GET /agreement/invitations/pending
+
+Do not blindly append the Socket.IO payload to the UI as the only source of state.
+
+Instead, invalidate/refetch the pending-invitations query so that REST remains the authoritative state.
+
+Accept Invitation
+
+The pending invitation returned by this API contains:
+
+participant.id
+
+That ID is used for the existing invitation-status API.
+
+PATCH /api/v1/agreement/projects/{projectId}/agreement/participants/{participantId}
+
+Request:
+
+{
+  "status": "ACCEPTED"
+}
+
+After successful acceptance:
+
+PENDING
+   ↓
+ACCEPTED
+
+The pending invitation query should then be invalidated/refetched.
+
+Decline Invitation
+
+Use the same existing endpoint:
+
+PATCH /api/v1/agreement/projects/{projectId}/agreement/participants/{participantId}
+
+Request:
+
+{
+  "status": "DECLINED"
+}
+
+State transition:
+
+PENDING
+   ↓
+DECLINED
+
+The invitation must disappear from the pending list after the mutation succeeds.
+
+Client Withdraws Invitation
+
+The existing withdraw API changes:
+
+PENDING
+   ↓
+WITHDRAWN
+
+The professional's pending invitation list must therefore no longer contain the invitation.
+
+The frontend should invalidate the pending invitation query when the corresponding Socket.IO withdrawal event is received.
+
+Socket.IO Relationship
+
+The existing Socket.IO events remain useful.
+
+Relevant events include:
+
+AGREEMENT_INVITATION_CREATED
+AGREEMENT_INVITATION_ACCEPTED
+AGREEMENT_INVITATION_DECLINED
+AGREEMENT_INVITATION_WITHDRAWN
+
+The REST API is still required because Socket.IO cannot guarantee historical state retrieval.
+
+Responsibilities
+Mechanism	Responsibility
+REST	Persistent state
+Socket.IO	Realtime notification
+Database	Source of truth
+React Query/cache	Frontend synchronization
+Security
+
+The endpoint must be protected by the existing authentication middleware.
+
+Do not accept:
+
+GET /agreement/invitations/pending?userId=...
+
+as an authorization mechanism.
+
+The authenticated identity must always come from:
+
+req.user.id
+
+This prevents a user from requesting another user's invitations.
+
+Error Cases
+Unauthorized
+401 Unauthorized
+
+When the access token is missing, invalid, expired, or otherwise unauthenticated.
+
+Invalid Pagination
+
+Example:
+
+?page=0&limit=-1
+
+should result in validation failure.
+
+The query schema should enforce:
+
+page >= 1
+1 <= limit <= 100
+No Pending Invitations
+
+This is not an error.
+
+Return:
+
+{
+  "success": true,
+  "data": {
+    "invitations": [],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 0,
+      "totalPages": 0,
+      "hasNext": false
+    }
+  }
+}
+Caching Considerations
+
+Pending invitations are highly dynamic.
+
+Therefore this endpoint should not use a long-lived cache.
+
+If Redis caching is introduced later, use a short TTL and invalidate the user's cache whenever an invitation changes.
+
+Recommended cache key:
+
+agreement:invitations:pending:user:{userId}:page:{page}:limit:{limit}
+
+Invalidate on:
+
+INVITATION_CREATED
+INVITATION_ACCEPTED
+INVITATION_DECLINED
+INVITATION_WITHDRAWN
+PROFESSIONAL_REMOVED
+
+The database remains authoritative.
+
+Testing Checklist
+Authentication
+ Request without access token returns 401.
+ Invalid access token returns 401.
+ Valid professional token returns invitations.
+User isolation
+ User A cannot retrieve User B's invitations.
+ No userId query parameter is accepted as an authorization mechanism.
+Status filtering
+ PENDING invitation is returned.
+ ACCEPTED invitation is excluded.
+ DECLINED invitation is excluded.
+ WITHDRAWN invitation is excluded.
+Role filtering
+ PROFESSIONAL invitation is returned.
+ CLIENT participant is excluded.
+Pagination
+ Default page is 1.
+ Default limit is 20.
+ Custom page works.
+ Custom limit works.
+ hasNext is correct.
+ totalPages is correct.
+Relations
+ Agreement information is returned.
+ Project information is returned.
+ Inviter information is returned.
+ Missing profile does not cause the request to fail.
+ avatarUrl: null is handled correctly.
+Invitation lifecycle
+PENDING
+   │
+   ├── ACCEPTED ──→ disappears from pending API
+   │
+   ├── DECLINED ──→ disappears from pending API
+   │
+   └── WITHDRAWN → disappears from pending API
+Realtime synchronization
+ New Socket.IO invitation causes pending list refresh.
+ Acceptance removes invitation from pending UI.
+ Decline removes invitation from pending UI.
+ Withdrawal removes invitation from pending UI.
+ Refreshing the browser restores pending invitations from REST.
+ Offline users can retrieve missed invitations through REST.
+Complete API Contract
+GET /api/v1/agreement/invitations/pending
+Query
+page?: number
+limit?: number
+Authentication
+Bearer accessToken
+Authorization scope
+Authenticated user
+Database filter
+userId = req.user.id
+role = PROFESSIONAL
+invitationStatus = PENDING
+Returns
+Pending AgreementParticipant records
++
+Agreement
++
+Project
++
+Inviter profile
++
+Pagination
+Source of truth
+PostgreSQL
+Realtime companion
+Socket.IO
+Primary frontend use
+Professional Dashboard
+→ Pending Invitations
+→ View Agreement
+→ Accept / Decline
+API Lifecycle
+CLIENT
+  │
+  │ Invite professional
+  ▼
+POST /agreement/projects/:projectId/agreement/participants
+  │
+  ▼
+AgreementParticipant
+status = PENDING
+  │
+  ├──────────────► Socket.IO notification
+  │
+  ▼
+PROFESSIONAL
+  │
+  │ GET pending invitations
+  ▼
+GET /agreement/invitations/pending
+  │
+  ▼
+View invitation
+  │
+  ├──────────────► ACCEPTED
+  │
+  └──────────────► DECLINED
+  │
+  ▼
+Pending invitation removed from pending results
+
+This API completes the persistent retrieval side of the agreement invitation system; Socket.IO alone is insufficient because realtime events are not durable state.

@@ -147,7 +147,18 @@ export class ProfessionalDashboardService {
   // Quick Actions
   // ==================================================
 
-  static getQuickActions(): ProfessionalQuickAction[] {
+  
+static async getPendingInvitations(userId: string) {
+  const invites = await ProfessionalDashboardRepository.getPendingInvitations(userId);
+  return invites.map(invite => ({
+    id: invite.id,
+    title: invite.agreement.project.title,
+    clientName: invite.agreement.createdBy.profile ? `${invite.agreement.createdBy.profile.firstName} ${invite.agreement.createdBy.profile.lastName}` : '',
+    projectId: invite.agreement.project.id
+  }));
+}
+
+static getQuickActions(): ProfessionalQuickAction[] {
     return [
       {
         key:

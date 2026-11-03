@@ -1,0 +1,148 @@
+
+.account {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.greeting {
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.trigger:hover,
+.trigger[aria-expanded="true"] {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border);
+}
+
+.trigger:focus-visible,
+.menuItem:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.chevron,
+.chevronOpen {
+  transition: transform 120ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.dropdown {
+  position: absolute;
+  z-index: 100;
+  top: calc(100% + 10px);
+  right: 0;
+
+  width: min(300px, calc(100vw - 24px));
+  padding: var(--space-8);
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.userSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-12);
+  min-width: 0;
+}
+
+.userText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.fullName {
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.email {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.separator {
+  height: 1px;
+  margin: var(--space-4) 0;
+  background: var(--color-border);
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+
+  width: 100%;
+  padding: 10px var(--space-12);
+
+  border: 0;
+  border-radius: var(--radius-md);
+
+  color: var(--color-text-primary);
+  background: transparent;
+
+  text-align: left;
+  font: inherit;
+  font-size: var(--text-sm);
+
+  cursor: pointer;
+}
+
+.menuItem:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.menuItem:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.logout {
+  color: var(--color-error);
+}
+
+@media (max-width: 480px) {
+  .identity {
+    display: none;
+  }
+
+  .dropdown {
+    right: 0;
+  }
+}

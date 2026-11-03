@@ -21,6 +21,7 @@ import { AgreementParticipantRepository } from "../repositories/agreement-partic
 import type { InviteProfessionalDto } from "../dtos/invite-professional.dto.js";
 import type { UpdateInvitationStatusDto } from "../dtos/update-invitation-status.dto.js";
 import { ProjectConversationService } from "../../communication/services/project-conversation.service.js"
+import type { ListPendingAgreementInvitationsDto } from "../dtos/list-pending-agreement-invitations.dto.js";
 
 export class AgreementParticipantService {
   // ==================================================
@@ -737,4 +738,15 @@ static async withdrawInvitation(
   return updatedParticipant;
 }
 
+
+static async getPendingInvitations(
+  userId: string,
+  query: ListPendingAgreementInvitationsDto
+) {
+  return AgreementParticipantRepository
+    .findPendingInvitationsByUserId(
+      userId,
+      query
+    );
+}
 }

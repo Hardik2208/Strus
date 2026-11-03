@@ -3,14 +3,28 @@ import { ErrorCode } from "../../../core/errors/ErrorCodes.js";
 
 export class ProjectAssetValidator {
   private static readonly MAX_FILES = 20;
+  private static readonly UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  // ==================================================
+  // UUID Validation
+  // ==================================================
+
+  static validateUUID(id: string, name = "ID"): void {
+    if (!id || typeof id !== "string" || !this.UUID_REGEX.test(id)) {
+      throw new AppError(
+        `Invalid ${name}.`,
+        400,
+        ErrorCode.INVALID_PROJECT_ASSET
+      );
+    }
+  }
 
   // ==================================================
   // Files
   // ==================================================
 
-  static validateFiles(
-    files: Express.Multer.File[]
-  ): void {
+  static validateFiles(files: Express.Multer.File[]): void {
     const uploadedFiles = files ?? [];
 
     if (uploadedFiles.length === 0) {
@@ -21,10 +35,7 @@ export class ProjectAssetValidator {
       );
     }
 
-    if (
-      uploadedFiles.length >
-      ProjectAssetValidator.MAX_FILES
-    ) {
+    if (uploadedFiles.length > ProjectAssetValidator.MAX_FILES) {
       throw new AppError(
         `Maximum ${ProjectAssetValidator.MAX_FILES} files are allowed.`,
         400,
@@ -32,15 +43,10 @@ export class ProjectAssetValidator {
       );
     }
 
-    const duplicateNames =
-      new Set<string>();
+    const duplicateNames = new Set<string>();
 
     for (const file of uploadedFiles) {
-      if (
-        duplicateNames.has(
-          file.originalname
-        )
-      ) {
+      if (duplicateNames.has(file.originalname)) {
         throw new AppError(
           "Duplicate files are not allowed.",
           400,
@@ -48,9 +54,7 @@ export class ProjectAssetValidator {
         );
       }
 
-      duplicateNames.add(
-        file.originalname
-      );
+      duplicateNames.add(file.originalname);
     }
   }
 
@@ -58,11 +62,8 @@ export class ProjectAssetValidator {
   // Participants
   // ==================================================
 
-  static validateParticipants(
-    participantIds?: string[]
-  ): void {
-    const participants =
-      participantIds ?? [];
+  static validateParticipants(participantIds?: string[]): void {
+    const participants = participantIds ?? [];
 
     if (participants.length === 0) {
       throw new AppError(
@@ -72,10 +73,11 @@ export class ProjectAssetValidator {
       );
     }
 
-    const uniqueIds =
-      new Set<string>();
+    const uniqueIds = new Set<string>();
 
     for (const id of participants) {
+      this.validateUUID(id, "participant ID");
+
       if (uniqueIds.has(id)) {
         throw new AppError(
           "Duplicate participant selected.",
@@ -86,7 +88,5 @@ export class ProjectAssetValidator {
 
       uniqueIds.add(id);
     }
-
-    
   }
 }

@@ -23,7 +23,7 @@ import { agreementRoutes } from "./modules/agreement/index.js";
 import { executionRoutes } from "./modules/execution/index.js"
 import { dashboardRoutes } from "./modules/dashboard/index.js";
 import { communicationRoutes } from "./modules/communication/index.js";
-import { notificationRoutes } from "./modules/event/index.js";
+import { eventRoutes } from "./modules/event/index.js";
 import { negotiationRoutes } from "./modules/negotiation/index.js";
 import { disputeRoutes } from "./modules/dispute/index.js";
 import { actionRequestRoutes } from "./modules/action-request/index.js";
@@ -53,7 +53,7 @@ app.use("/api/v1/agreement", agreementRoutes);
 app.use("/api/v1/execution", executionRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
 app.use("/api/v1/communication", communicationRoutes);
-app.use("/api/v1/notification", notificationRoutes);
+app.use("/api/v1/events", eventRoutes);
 app.use("/api/v1/negotiation", negotiationRoutes);
 app.use("/api/v1/disputes", disputeRoutes);
 app.use("/api/v1/action-requests", actionRequestRoutes);

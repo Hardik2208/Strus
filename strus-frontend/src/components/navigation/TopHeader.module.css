@@ -1,0 +1,150 @@
+
+.header {
+  height: 60px;
+  min-height: 60px;
+  position: relative;
+  z-index: 30;
+
+  background-color: var(--color-bg);
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 var(--space-32);
+  margin-top: var(--space-16);
+}
+
+.headerLeft {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.headerCenter {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.headerRight {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.menuButton {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  padding: var(--space-8);
+  border-radius: var(--radius-sm);
+}
+
+.menuButton:hover {
+  background-color: var(--color-surface-hover);
+}
+
+/* Existing role toggle styles */
+
+.toggleContainer {
+  position: relative;
+  display: inline-flex;
+  background-color: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 100px;
+  padding: 4px;
+  width: 200px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.toggleIndicator {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  background-color: var(--color-surface);
+  border-radius: 100px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+}
+
+.isClient .toggleIndicator {
+  transform: translateX(0);
+}
+
+.isProfessional .toggleIndicator {
+  transform: translateX(100%);
+}
+
+.toggleButton {
+  flex: 1;
+  position: relative;
+  background: transparent;
+  border: none;
+  border-radius: 100px;
+  padding: 6px 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: color 0.3s ease;
+  z-index: 2;
+}
+
+.toggleButton[aria-pressed="true"] {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+/* Tablet */
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0 var(--space-16);
+    gap: var(--space-8);
+  }
+
+  .headerLeft,
+  .headerRight {
+    flex: 0 0 auto;
+  }
+
+  .headerCenter {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .headerRight {
+    gap: var(--space-8);
+  }
+
+  .menuButton {
+    display: flex;
+  }
+}
+
+/* Mobile */
+
+@media (max-width: 480px) {
+  .header {
+    padding: 0 var(--space-12);
+  }
+
+  .headerCenter {
+    justify-content: flex-start;
+  }
+
+  .headerRight {
+    gap: 4px;
+  }
+}

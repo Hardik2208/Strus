@@ -68,7 +68,15 @@ export class ProfessionalDashboardController {
   // Quick Actions
   // ==================================================
 
-  static async getQuickActions(
+  
+static async getPendingInvitations(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const invites = await ProfessionalDashboardService.getPendingInvitations(req.user.id);
+    res.status(200).json({ success: true, data: { invitations: invites } });
+  } catch (err) { next(err); }
+}
+
+static async getQuickActions(
     _req: AuthenticatedRequest,
     res: Response,
     next: NextFunction

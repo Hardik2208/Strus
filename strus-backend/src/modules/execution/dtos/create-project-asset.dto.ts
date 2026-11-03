@@ -2,24 +2,27 @@ import { z } from "zod";
 
 export const createProjectAssetSchema = z.object({
   visibleToParticipants: z
-    .preprocess(
-      (value) => {
-        if (Array.isArray(value)) {
-          return value;
-        }
-
-        if (typeof value === "string") {
-          return [value];
-        }
-
+    .preprocess((value) => {
+      if (Array.isArray(value)) {
         return value;
-      },
-      z.array(z.uuid()).min(
-        1,
-        "Select at least one professional."
-      )
-    ),
+      }
+
+      if (typeof value === "string") {
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        } catch {
+          // not JSON array
+        }
+        return [value];
+      }
+
+      return value;
+    }, z.array(z.uuid()).min(1, "Select at least one professional.")),
 });
 
-export type CreateProjectAssetDto =
-  z.infer<typeof createProjectAssetSchema>;
+export type CreateProjectAssetDto = z.infer<
+  typeof createProjectAssetSchema
+>;

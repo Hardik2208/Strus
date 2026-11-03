@@ -553,4 +553,14 @@ static async transfer(
     previousWorkspaceId,
   };
 }
+
+static async getProfessionalProjects(
+  userId: string,
+  query: ListProjectsDto
+) {
+  return ProjectRepository.findProfessionalProjects(
+    userId,
+    query
+  );
+}
 }

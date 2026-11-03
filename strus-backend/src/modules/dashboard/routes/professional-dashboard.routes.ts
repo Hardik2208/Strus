@@ -22,6 +22,13 @@ router.get(
   ProfessionalDashboardController.getActiveProjects
 );
 
+
+router.get(
+  "/pending-invitations",
+  authenticate,
+  ProfessionalDashboardController.getPendingInvitations
+);
+
 router.get(
   "/quick-actions",
   authenticate,

@@ -6,7 +6,7 @@ import { ActionRequestService } from "../../action-request/services/action-reque
 import { NegotiationRepository } from "../../negotiation/repositories/negotiation.repository.js";
 import { ActionRequestRepository } from "../../action-request/repositories/action-request.repository.js";
 
-import { SubmissionAutoApprovalJob } from "../../execution/jobs/submission-auto-approval.job.js";
+import { SubmissionAutoApprovalJob } from "./submission-auto-approval.job.js";
 
 export class EventSchedulerJobs {
 

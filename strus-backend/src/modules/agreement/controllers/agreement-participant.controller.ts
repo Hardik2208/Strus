@@ -13,7 +13,9 @@ import type { UpdateInvitationStatusDto } from "../dtos/update-invitation-status
 import {
   inviteProfessionalSchema,
 } from "../dtos/invite-professional.dto.js";
-
+import {
+  listPendingAgreementInvitationsQuerySchema,
+} from "../dtos/list-pending-agreement-invitations.dto.js";
 import {
   updateInvitationStatusSchema,
 } from "../dtos/update-invitation-status.dto.js";
@@ -333,6 +335,56 @@ static async withdrawInvitation(
       AgreementParticipantMapper.toResponse(
         participant
       ),
+  });
+}
+
+static async getPendingInvitations(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  const query =
+    listPendingAgreementInvitationsQuerySchema.parse(
+      req.query
+    );
+
+  const {
+    participants,
+    total,
+  } =
+    await AgreementParticipantService
+      .getPendingInvitations(
+        req.user.id,
+        query
+      );
+
+  const totalPages =
+    Math.ceil(
+      total / query.limit
+    );
+
+  return res.status(200).json({
+    success: true,
+
+    data: {
+      invitations:
+        AgreementParticipantMapper
+          .toInvitationResponseList(
+            participants
+          ),
+
+      pagination: {
+        page: query.page,
+
+        limit: query.limit,
+
+        total,
+
+        totalPages,
+
+        hasNext:
+          query.page < totalPages,
+      },
+    },
   });
 }
 }

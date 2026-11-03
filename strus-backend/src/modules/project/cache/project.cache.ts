@@ -181,4 +181,61 @@ export class ProjectCache {
   ),
 ]);
 }
+
+
+  // ==================================================
+  // Professional Project List
+  // ==================================================
+
+  private static professionalProjectsKey(
+    userId: string,
+    queryHash: string
+  ) {
+    return `professional:${userId}:projects:${queryHash}`;
+  }
+
+  static async getProfessionalProjects(
+    userId: string,
+    queryHash: string
+  ) {
+    const cached = await redis.get(
+      this.professionalProjectsKey(
+        userId,
+        queryHash
+      )
+    );
+
+    return cached
+      ? JSON.parse(cached)
+      : null;
+  }
+
+  static async setProfessionalProjects(
+    userId: string,
+    queryHash: string,
+    value: unknown
+  ) {
+    await redis.set(
+      this.professionalProjectsKey(
+        userId,
+        queryHash
+      ),
+      JSON.stringify(value),
+      {
+        EX: TTL,
+      }
+    );
+  }
+
+  static async invalidateProfessionalProjects(
+    userId: string
+  ) {
+    const keys = await redis.keys(
+      `professional:${userId}:projects:*`
+    );
+
+    if (keys.length > 0) {
+      await redis.del(keys);
+    }
+  }
 }

@@ -1,7 +1,7 @@
 import { logger } from "../../../core/logger/index.js";
 import { prisma } from "../../../core/database/prisma.js";
 
-import { SubmissionAutoApprovalJob } from "../../execution/jobs/submission-auto-approval.job.js";
+import { SubmissionAutoApprovalJob } from "./submission-auto-approval.job.js";
 
 import { NegotiationService } from "../../negotiation/services/negotiation.service.js";
 import { NegotiationRepository } from "../../negotiation/repositories/negotiation.repository.js";

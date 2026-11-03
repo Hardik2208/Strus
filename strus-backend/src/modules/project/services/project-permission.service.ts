@@ -56,18 +56,35 @@ export class ProjectPermissionService {
       );
     }
 
+    // 1. Project creator always has access
+    if (project.createdById === userId) {
+      return project;
+    }
+
+    // 2. Agreement participant has access
+    const isParticipant = (project as any).agreement?.participants?.some(
+      (p: any) => p.userId === userId
+    );
+    if (isParticipant) {
+      return project;
+    }
+
+    // 3. Workspace Owner/Admin has access
     const membership =
-      await this.ensureWorkspaceMember(
+      await ProjectRepository.findWorkspaceMembership(
         project.workspaceId,
         userId
       );
 
-    // Owner/Admin can view every project.
-    // Members can only view projects they created.
-    if (
-      membership.role === WorkspaceRole.MEMBER &&
-      project.createdById !== userId
-    ) {
+    if (!membership) {
+      throw new AppError(
+        "Workspace not found.",
+        404,
+        ErrorCode.WORKSPACE_NOT_FOUND
+      );
+    }
+
+    if (membership.role === WorkspaceRole.MEMBER) {
       throw new AppError(
         "Project not found.",
         404,

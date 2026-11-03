@@ -94,7 +94,18 @@ export class ProjectRepository {
       deletedAt: null,
 
       ...(role === WorkspaceRole.MEMBER && {
-        createdById: userId,
+        OR: [
+          { createdById: userId },
+          {
+            agreement: {
+              participants: {
+                some: {
+                  userId,
+                },
+              },
+            },
+          },
+        ],
       }),
 
       ...(query.status && {
@@ -162,6 +173,16 @@ export class ProjectRepository {
         workspace: {
           select: {
             id: true,
+          },
+        },
+
+        agreement: {
+          include: {
+            participants: {
+              select: {
+                userId: true,
+              },
+            },
           },
         },
 
@@ -340,4 +361,83 @@ static async findProjectForDeletion(
     },
   });
 }
+
+  static async findProfessionalProjects(
+    userId: string,
+    query: ListProjectsDto
+  ) {
+    const where: Prisma.ProjectWhereInput = {
+      deletedAt: null,
+
+      agreement: {
+        participants: {
+          some: {
+            userId,
+            role: "PROFESSIONAL",
+            invitationStatus: "ACCEPTED",
+          },
+        },
+      },
+
+      ...(query.status && {
+        status: query.status,
+      }),
+
+      ...(query.search
+        ? {
+            OR: [
+              {
+                title: {
+                  contains: query.search,
+                  mode: "insensitive",
+                },
+              },
+              {
+                description: {
+                  contains: query.search,
+                  mode: "insensitive",
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    const [projects, total] =
+      await prisma.$transaction([
+        prisma.project.findMany({
+          where,
+
+          include: {
+            workspace: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+
+          skip:
+            (query.page - 1) *
+            query.limit,
+
+          take: query.limit,
+
+          orderBy: {
+            [query.sort]:
+              query.order,
+          },
+        }),
+
+        prisma.project.count({
+          where,
+        }),
+      ]);
+
+    return {
+      projects,
+      total,
+    };
+  }
 }

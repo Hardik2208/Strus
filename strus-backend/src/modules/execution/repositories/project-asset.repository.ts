@@ -49,9 +49,7 @@ export class ProjectAssetRepository {
   // Get Project Assets
   // ==================================================
 
-  static findProjectAssets(
-    projectId: string
-  ) {
+  static findProjectAssets(projectId: string) {
     return prisma.projectAsset.findMany({
       where: {
         projectId,
@@ -66,17 +64,35 @@ export class ProjectAssetRepository {
         },
 
         visibleToParticipants: {
-  select: {
-    id: true,
-    agreementParticipantId: true,
+          select: {
+            id: true,
+            agreementParticipantId: true,
 
-    participant: {
-      select: {
-        id: true,
+            participant: {
+              select: {
+                id: true,
+                role: true,
 
-        role: true,
+                user: {
+                  select: {
+                    id: true,
 
-        user: {
+                    profile: {
+                      select: {
+                        username: true,
+                        firstName: true,
+                        lastName: true,
+                        avatarUrl: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+
+        createdBy: {
           select: {
             id: true,
 
@@ -90,25 +106,6 @@ export class ProjectAssetRepository {
             },
           },
         },
-      },
-    },
-  },
-},
-
-        createdBy: {
-  select: {
-    id: true,
-
-    profile: {
-      select: {
-        username: true,
-        firstName: true,
-        lastName: true,
-        avatarUrl: true,
-      },
-    },
-  },
-},
       },
 
       orderBy: {
@@ -121,16 +118,11 @@ export class ProjectAssetRepository {
   // Get Asset
   // ==================================================
 
-  static findProjectAsset(
-    projectId: string,
-    assetId: string
-  ) {
+  static findProjectAsset(projectId: string, assetId: string) {
     return prisma.projectAsset.findFirst({
       where: {
         id: assetId,
-
         projectId,
-
         deletedAt: null,
       },
 
@@ -142,34 +134,33 @@ export class ProjectAssetRepository {
         },
 
         visibleToParticipants: {
-  select: {
-    id: true,
-    agreementParticipantId: true,
-
-    participant: {
-      select: {
-        id: true,
-
-        role: true,
-
-        user: {
           select: {
             id: true,
+            agreementParticipantId: true,
 
-            profile: {
+            participant: {
               select: {
-                username: true,
-                firstName: true,
-                lastName: true,
-                avatarUrl: true,
+                id: true,
+                role: true,
+
+                user: {
+                  select: {
+                    id: true,
+
+                    profile: {
+                      select: {
+                        username: true,
+                        firstName: true,
+                        lastName: true,
+                        avatarUrl: true,
+                      },
+                    },
+                  },
+                },
               },
             },
           },
         },
-      },
-    },
-  },
-},
 
         createdBy: {
           include: {
@@ -190,6 +181,22 @@ export class ProjectAssetRepository {
   ) {
     return tx.projectAssetFile.createMany({
       data,
+    });
+  }
+
+  // ==================================================
+  // Find Existing Asset File
+  // ==================================================
+
+  static findExistingAssetFile(
+    projectAssetId: string,
+    originalName: string
+  ) {
+    return prisma.projectAssetFile.findFirst({
+      where: {
+        projectAssetId,
+        originalName,
+      },
     });
   }
 
@@ -218,11 +225,7 @@ export class ProjectAssetRepository {
     data: Prisma.ProjectAssetVisibilityCreateManyInput[]
   ) {
     return Promise.all([
-      this.deleteVisibility(
-        tx,
-        assetId
-      ),
-
+      this.deleteVisibility(tx, assetId),
       tx.projectAssetVisibility.createMany({
         data,
       }),
@@ -252,9 +255,7 @@ export class ProjectAssetRepository {
   // Get Asset Files
   // ==================================================
 
-  static findFiles(
-    assetId: string
-  ) {
+  static findFiles(assetId: string) {
     return prisma.projectAssetFile.findMany({
       where: {
         projectAssetId: assetId,
@@ -267,105 +268,100 @@ export class ProjectAssetRepository {
   }
 
   // ==================================================
-// Visible Assets
-// ==================================================
+  // Visible Assets
+  // ==================================================
 
-static findVisibleAssets(
-  projectId: string,
-  agreementParticipantId: string
-) {
-  return prisma.projectAsset.findMany({
-    where: {
-      projectId,
-
-      deletedAt: null,
-
-      visibleToParticipants: {
-        some: {
-          agreementParticipantId,
-        },
-      },
-    },
-
-    include: {
-      files: {
-        orderBy: {
-          uploadedAt: "asc",
+  static findVisibleAssets(
+    projectId: string,
+    agreementParticipantId: string
+  ) {
+    return prisma.projectAsset.findMany({
+      where: {
+        projectId,
+        deletedAt: null,
+        visibleToParticipants: {
+          some: {
+            agreementParticipantId,
+          },
         },
       },
 
-      visibleToParticipants: {
-  where: {
-    agreementParticipantId,
-  },
-
-  select: {
-    id: true,
-    agreementParticipantId: true,
-  },
-},
-
-      createdBy: {
-        include: {
-          profile: true,
+      include: {
+        files: {
+          orderBy: {
+            uploadedAt: "asc",
+          },
         },
-      },
-    },
 
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
-}
+        visibleToParticipants: {
+          where: {
+            agreementParticipantId,
+          },
 
-// ==================================================
-// Visible Asset
-// ==================================================
-
-static findVisibleAsset(
-  projectId: string,
-  assetId: string,
-  agreementParticipantId: string
-) {
-  return prisma.projectAsset.findFirst({
-    where: {
-      id: assetId,
-
-      projectId,
-
-      deletedAt: null,
-
-      visibleToParticipants: {
-        some: {
-          agreementParticipantId,
+          select: {
+            id: true,
+            agreementParticipantId: true,
+          },
         },
-      },
-    },
 
-    include: {
-      files: {
-        orderBy: {
-          uploadedAt: "asc",
+        createdBy: {
+          include: {
+            profile: true,
+          },
         },
       },
 
-      visibleToParticipants: {
-  where: {
-    agreementParticipantId,
-  },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
 
-  select: {
-    id: true,
-    agreementParticipantId: true,
-  },
-},
+  // ==================================================
+  // Visible Asset
+  // ==================================================
 
-      createdBy: {
-        include: {
-          profile: true,
+  static findVisibleAsset(
+    projectId: string,
+    assetId: string,
+    agreementParticipantId: string
+  ) {
+    return prisma.projectAsset.findFirst({
+      where: {
+        id: assetId,
+        projectId,
+        deletedAt: null,
+        visibleToParticipants: {
+          some: {
+            agreementParticipantId,
+          },
         },
       },
-    },
-  });
-}
+
+      include: {
+        files: {
+          orderBy: {
+            uploadedAt: "asc",
+          },
+        },
+
+        visibleToParticipants: {
+          where: {
+            agreementParticipantId,
+          },
+
+          select: {
+            id: true,
+            agreementParticipantId: true,
+          },
+        },
+
+        createdBy: {
+          include: {
+            profile: true,
+          },
+        },
+      },
+    });
+  }
 }

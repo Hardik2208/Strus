@@ -265,7 +265,7 @@ async searchProfiles(
         where,
 
         select: {
-          id: true,
+          userId: true,
           username: true,
           firstName: true,
           lastName: true,
@@ -287,7 +287,13 @@ async searchProfiles(
     ]);
 
   return {
-    items,
+    items: items.map(item => ({
+      id: item.userId,
+      username: item.username,
+      firstName: item.firstName,
+      lastName: item.lastName,
+      avatarUrl: item.avatarUrl,
+    })),
     total,
   };
 }

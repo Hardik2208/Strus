@@ -787,4 +787,29 @@ static async getAuditLogs(
   }
 }
 
+static async getPendingInvitations(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user.id;
+
+    const invitations =
+      await WorkspaceService.getPendingInvitationsForUser(
+        userId
+      );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        invitations,
+        count: invitations.length,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 }

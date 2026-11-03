@@ -544,4 +544,86 @@ static async transfer(
     next(error);
   }
 }
+
+  // ==================================================
+  // Get Professional Projects
+  // ==================================================
+
+  static async getProfessionalProjects(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const userId = req.user.id;
+
+      const query =
+        listProjectsQuerySchema.parse(
+          req.query
+        );
+
+      const cacheKey =
+        JSON.stringify(query);
+
+      const cached =
+        await ProjectCache.getProfessionalProjects(
+          userId,
+          cacheKey
+        );
+
+      if (cached) {
+        res.status(200).json({
+          success: true,
+          data: cached,
+        });
+
+        return;
+      }
+
+      const {
+        projects,
+        total,
+      } =
+        await ProjectService.getProfessionalProjects(
+          userId,
+          query
+        );
+
+      const response = {
+        projects:
+          ProjectMapper.toResponseList(
+            projects
+          ),
+
+        pagination: {
+          page: query.page,
+
+          limit: query.limit,
+
+          total,
+
+          totalPages: Math.ceil(
+            total / query.limit
+          ),
+
+          hasNext:
+            query.page * query.limit <
+            total,
+        },
+      };
+
+      await ProjectCache.setProfessionalProjects(
+        userId,
+        cacheKey,
+        response
+      );
+
+      res.status(200).json({
+        success: true,
+        data: response,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

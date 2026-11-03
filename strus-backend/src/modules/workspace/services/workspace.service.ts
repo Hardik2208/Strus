@@ -1320,4 +1320,56 @@ static async getAuditLogs(
   };
 }
 
+
+static async getPendingInvitationsForUser(
+  userId: string
+) {
+  const invitations =
+    await WorkspaceRepository.findPendingInvitationsForUser(
+      userId
+    );
+
+  return invitations.map((invitation) => ({
+    id: invitation.id,
+
+    status: invitation.status,
+
+    expiresAt: invitation.expiresAt,
+
+    createdAt: invitation.createdAt,
+
+    workspace: {
+      id: invitation.workspace.id,
+      name: invitation.workspace.name,
+      slug: invitation.workspace.slug,
+      description: invitation.workspace.description,
+      workspaceType:
+        invitation.workspace.workspaceType,
+
+      owner: {
+        id: invitation.workspace.owner.id,
+        username:
+          invitation.workspace.owner.profile?.username ?? "",
+        firstName:
+          invitation.workspace.owner.profile?.firstName ?? "",
+        lastName:
+          invitation.workspace.owner.profile?.lastName ?? "",
+        avatarUrl:
+          invitation.workspace.owner.profile?.avatarUrl ?? null,
+      },
+    },
+
+    invitedBy: {
+      id: invitation.invitedBy.id,
+      username:
+        invitation.invitedBy.profile?.username ?? "",
+      firstName:
+        invitation.invitedBy.profile?.firstName ?? "",
+      lastName:
+        invitation.invitedBy.profile?.lastName ?? "",
+      avatarUrl:
+        invitation.invitedBy.profile?.avatarUrl ?? null,
+    },
+  }));
+}
 }

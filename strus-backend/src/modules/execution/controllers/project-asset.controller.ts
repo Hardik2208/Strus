@@ -4,7 +4,6 @@ import type {
 } from "express";
 
 import type { AuthenticatedRequest } from "../../auth/interfaces/auth.interface.js";
-
 import type { CreateProjectAssetDto } from "../dtos/create-project-asset.dto.js";
 import { ExecutionPublisher } from "../../event/publishers/execution.publisher.js";
 import { ProjectAssetService } from "../services/project-asset.service.js";
@@ -24,31 +23,22 @@ export class ProjectAssetController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const asset =
-        await ProjectAssetService.create(
-          req.params.projectId,
-          req.user.id,
-          req.body,
-          (req.files ??
-            []) as Express.Multer.File[]
-        );
+      const asset = await ProjectAssetService.create(
+        req.params.projectId,
+        req.user.id,
+        req.body,
+        (req.files ?? []) as Express.Multer.File[]
+      );
 
       await ExecutionPublisher.publishProjectAssetShared({
-
-  createdById: req.user.id,
-
-  projectId: req.params.projectId,
-
-  projectAssetId: asset.id,
-
-});
+        createdById: req.user.id,
+        projectId: req.params.projectId,
+        projectAssetId: asset.id,
+      });
 
       res.status(201).json({
         success: true,
-
-        message:
-          "Project asset created successfully.",
-
+        message: "Project asset created successfully.",
         data: asset,
       });
     } catch (error) {
@@ -61,37 +51,26 @@ export class ProjectAssetController {
   // ==================================================
 
   static async list(
-  req: AuthenticatedRequest<{
-    projectId: string;
-  }>,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  try {
-    const assets =
-      await ProjectAssetService.getProjectAssets(
+    req: AuthenticatedRequest<{
+      projectId: string;
+    }>,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const assets = await ProjectAssetService.getProjectAssets(
         req.params.projectId,
         req.user.id
       );
 
-    const response = assets.map(asset => ({
-      ...asset,
-
-      files: asset.files.map(file => ({
-        ...file,
-
-        size: Number(file.size),
-      })),
-    }));
-
-    res.status(200).json({
-      success: true,
-      data: response,
-    });
-  } catch (error) {
-    next(error);
+      res.status(200).json({
+        success: true,
+        data: assets,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-}
 
   // ==================================================
   // Get
@@ -106,16 +85,14 @@ export class ProjectAssetController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const asset =
-        await ProjectAssetService.getAsset(
-          req.params.projectId,
-          req.params.assetId,
-          req.user.id
-        );
+      const asset = await ProjectAssetService.getAsset(
+        req.params.projectId,
+        req.params.assetId,
+        req.user.id
+      );
 
       res.status(200).json({
         success: true,
-
         data: asset,
       });
     } catch (error) {
@@ -140,15 +117,12 @@ export class ProjectAssetController {
         req.params.projectId,
         req.params.assetId,
         req.user.id,
-        (req.files ??
-          []) as Express.Multer.File[]
+        (req.files ?? []) as Express.Multer.File[]
       );
 
       res.status(200).json({
         success: true,
-
-        message:
-          "Files added successfully.",
+        message: "Files added successfully.",
       });
     } catch (error) {
       next(error);
@@ -176,9 +150,7 @@ export class ProjectAssetController {
 
       res.status(200).json({
         success: true,
-
-        message:
-          "Project asset deleted successfully.",
+        message: "Project asset deleted successfully.",
       });
     } catch (error) {
       next(error);

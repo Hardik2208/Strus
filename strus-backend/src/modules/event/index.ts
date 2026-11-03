@@ -1,1 +1,1 @@
-export { default as notificationRoutes } from "./routes/index.js";
+export { default as eventRoutes } from "./routes/index.js";

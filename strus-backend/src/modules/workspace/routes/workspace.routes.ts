@@ -102,4 +102,10 @@ router.get(
   WorkspaceController.getAuditLogs
 );
 
+router.get(
+  "/invitations/pending",
+  authenticate,
+  WorkspaceController.getPendingInvitations
+);
+
 export { router as workspaceRoutes };

@@ -1,36 +1,75 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  /* Colors - Background & Surfaces */
-  --color-bg: #F7F0E2;
-  --color-surface: #FFF9EF;
-  --color-surface-subtle: #F3E9D8;
-  --color-surface-hover: #EFE3D0;
+  /* Colors - Light Theme (Reference SaaS Palette) */
+  --color-bg: #F7F7F5;
+  --color-background: #F7F7F5;
   
-  /* Colors - Text */
-  --color-text-primary: #51483E;
-  --color-text-secondary: #756B60;
-  --color-text-muted: #9A8F82;
+  --color-surface: #FAFAF8;
+  --color-surface-base: #FAFAF8;
+  --color-surface-subtle: #F0F4F3;
+  --color-surface-hover: #E8ECEB;
+  --color-surface-elevated: #FFFFFF;
   
-  /* Colors - Borders */
-  --color-border: #E2D7C6;
-  --color-border-strong: #D3C5B1;
+  /* Text */
+  --color-text-primary: #17191C;
+  --color-text-secondary: #697176;
+  --color-text-muted: #8E969C;
+  --color-text-tertiary: #B0B6BA;
   
-  /* Colors - Primary */
-  --color-primary: #B29462;
-  --color-primary-hover: #A18454;
-  --color-primary-soft: #EDE1C9;
-  
-  /* Colors - Semantic */
-  --color-success: #718267;
-  --color-warning: #B18A55;
-  --color-danger: #A9786E;
-  --color-info: #71858A;
-  
+  /* Borders */
+  --color-border: #E8EBEA;
+  --color-border-subtle: #F0F3F2;
+  --color-border-strong: #D4D9D7;
+  --color-border-hover: #C6CCC9;
+
+  /* Primary Accent - Reference Blue */
+  --color-primary: #347FF0;
+  --color-primary-hover: #2568D8;
+  --color-primary-dark: #1D55B8;
+  --color-primary-soft: #E5F0FF;
+  --color-primary-subtle: #F2F7FF;
+  --color-primary-light: #E5F0FF;
+  --color-primary-rgb: 52, 127, 240;
+
+  /* Status Colors - Soft & Professional */
+  --color-success: #16C34A;
+  --color-success-hover: #12A73E;
+  --color-success-light: #E8F9ED;
+  --color-success-subtle: #F0FAF2;
+  --color-success-rgb: 22, 195, 74;
+
+  --color-warning: #FF9B55;
+  --color-warning-hover: #E88540;
+  --color-warning-light: #FFF3EA;
+  --color-warning-subtle: #FFF8F3;
+  --color-warning-rgb: 255, 155, 85;
+
+  --color-error: #F04452;
+  --color-error-hover: #D73341;
+  --color-error-light: #FEECEE;
+  --color-error-subtle: #FFF5F6;
+  --color-error-rgb: 240, 68, 82;
+
+  --color-danger: #F04452;
+  --color-danger-light: #FEECEE;
+  --color-danger-rgb: 240, 68, 82;
+
+  --color-info: #54C7E8;
+  --color-info-hover: #3EB8DC;
+  --color-info-light: #EBF8FD;
+  --color-info-subtle: #F3FBFE;
+  --color-info-rgb: 84, 199, 232;
+
   /* Typography */
-  --font-display: "Fraunces", serif;
-  --font-body: "DM Sans", sans-serif;
-  
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Shadows - Minimal, Soft & Clean */
+  --shadow-sm: 0 1px 3px rgba(23, 25, 28, 0.04), 0 1px 2px rgba(23, 25, 28, 0.02);
+  --shadow-md: 0 4px 12px rgba(23, 25, 28, 0.05), 0 1px 3px rgba(23, 25, 28, 0.02);
+  --shadow-lg: 0 10px 25px -3px rgba(23, 25, 28, 0.07), 0 4px 6px -2px rgba(23, 25, 28, 0.03);
+
   /* Spacing */
   --space-4: 4px;
   --space-8: 8px;
@@ -42,24 +81,88 @@
   --space-40: 40px;
   --space-48: 48px;
   --space-64: 64px;
-  
+
   /* Border Radius */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
-  
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(81, 72, 62, 0.06);
-  --shadow-md: 0 4px 12px rgba(81, 72, 62, 0.08);
-  --shadow-lg: 0 10px 30px rgba(81, 72, 62, 0.10);
-  
+  --radius-full: 9999px;
+
   /* Typography Scale */
-  --text-xs: 12px; /* caption */
-  --text-sm: 13px; /* small */
-  --text-base: 15px; /* body */
-  --text-lg: 18px; /* card heading */
-  --text-xl: 22px; /* section */
-  --text-2xl: 28px; /* page heading */
-  --text-3xl: 36px; /* display */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 36px;
+}
+
+[data-theme="dark"] {
+  /* Colors - Dark Theme (Deep Charcoal Atmosphere) */
+  --color-bg: #111316;
+  --color-background: #111316;
+
+  --color-surface: #181B1F;
+  --color-surface-base: #181B1F;
+  --color-surface-subtle: #1F2329;
+  --color-surface-hover: #262B33;
+  --color-surface-elevated: #22262C;
+
+  /* Text */
+  --color-text-primary: #F0F2F5;
+  --color-text-secondary: #9BA3AC;
+  --color-text-muted: #6E7680;
+  --color-text-tertiary: #525963;
+
+  /* Borders - Subtle & Soft */
+  --color-border: #272C33;
+  --color-border-subtle: #1D2126;
+  --color-border-strong: #363D47;
+  --color-border-hover: #434B57;
+
+  /* Primary Accent - Retained Blue, tuned for dark mode readability */
+  --color-primary: #3B82F6;
+  --color-primary-hover: #4F91F8;
+  --color-primary-dark: #2568D8;
+  --color-primary-soft: rgba(59, 130, 246, 0.16);
+  --color-primary-subtle: rgba(59, 130, 246, 0.10);
+  --color-primary-light: rgba(59, 130, 246, 0.16);
+  --color-primary-rgb: 59, 130, 246;
+
+  /* Status Colors - Dark mode adapted */
+  --color-success: #22C55E;
+  --color-success-hover: #16A34A;
+  --color-success-light: rgba(34, 197, 94, 0.16);
+  --color-success-subtle: rgba(34, 197, 94, 0.08);
+  --color-success-rgb: 34, 197, 94;
+
+  --color-warning: #FF9B55;
+  --color-warning-hover: #FB8C3C;
+  --color-warning-light: rgba(255, 155, 85, 0.16);
+  --color-warning-subtle: rgba(255, 155, 85, 0.08);
+  --color-warning-rgb: 255, 155, 85;
+
+  --color-error: #F04452;
+  --color-error-hover: #E03544;
+  --color-error-light: rgba(240, 68, 82, 0.16);
+  --color-error-subtle: rgba(240, 68, 82, 0.08);
+  --color-error-rgb: 240, 68, 82;
+
+  --color-danger: #F04452;
+  --color-danger-light: rgba(240, 68, 82, 0.16);
+  --color-danger-rgb: 240, 68, 82;
+
+  --color-info: #54C7E8;
+  --color-info-hover: #3EB8DC;
+  --color-info-light: rgba(84, 199, 232, 0.16);
+  --color-info-subtle: rgba(84, 199, 232, 0.08);
+  --color-info-rgb: 84, 199, 232;
+
+  /* Shadows - Rich Dark Depth without glowing */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.55);
 }

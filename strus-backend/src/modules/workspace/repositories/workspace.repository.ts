@@ -736,4 +736,69 @@ static async findWorkspaceForDeletion(
     },
   });
 }
+
+static async findPendingInvitationsForUser(
+  userId: string
+) {
+  return prisma.workspaceInvitation.findMany({
+    where: {
+      invitedUserId: userId,
+      status: WorkspaceInvitationStatus.PENDING,
+      expiresAt: {
+        gt: new Date(),
+      },
+    },
+
+    select: {
+      id: true,
+
+      status: true,
+
+      expiresAt: true,
+
+      createdAt: true,
+
+      workspace: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          workspaceType: true,
+          owner: {
+            select: {
+              id: true,
+              profile: {
+                select: {
+                  username: true,
+                  firstName: true,
+                  lastName: true,
+                  avatarUrl: true,
+                },
+              },
+            },
+          },
+        },
+      },
+
+      invitedBy: {
+        select: {
+          id: true,
+          profile: {
+            select: {
+              username: true,
+              firstName: true,
+              lastName: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      },
+    },
+
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+}
 }
