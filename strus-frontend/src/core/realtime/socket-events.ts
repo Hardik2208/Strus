@@ -22,8 +22,25 @@ export const SOCKET_EVENTS = {
   // Execution
   SUBMISSION_CREATED: "SUBMISSION_CREATED",
 
-  // Agreement invitations
+    // Agreement
+  AGREEMENT_CREATED: "agreement:created",
+  AGREEMENT_UPDATED: "agreement:updated",
+
   AGREEMENT_INVITATION_CREATED: "agreement:invitation:created",
+  AGREEMENT_INVITATION_ACCEPTED: "agreement:invitation:accepted",
+  AGREEMENT_INVITATION_DECLINED: "agreement:invitation:declined",
+  AGREEMENT_INVITATION_WITHDRAWN: "agreement:invitation:withdrawn",
+
+  AGREEMENT_PARTICIPANT_REMOVED: "agreement:participant:removed",
+
+    // Communication
+  MESSAGE_SENT: "communication:message:sent",
+  MESSAGE_UPDATED: "communication:message:updated",
+  MESSAGE_DELETED: "communication:message:deleted",
+  MESSAGE_READ: "communication:message:read",
+
+  CONVERSATION_JOINED: "communication:conversation:joined",
+  CONVERSATION_LEFT: "communication:conversation:left",
 
   // Notifications
   NOTIFICATION_RECEIVED: "NOTIFICATION_RECEIVED",

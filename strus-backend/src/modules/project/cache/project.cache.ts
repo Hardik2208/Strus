@@ -1,7 +1,7 @@
 import { redis } from "../../../core/cache/redis.js";
 import { prisma } from "../../../core/database/prisma.js";
 import { ClientDashboardOverviewCache } from "../../dashboard/client-dashboard-cache/overview.cache.js";
-
+import { ProjectMapper } from "../mappers/project.mapper.js";
 import { ClientDashboardWorkspacesCache } from "../../dashboard/client-dashboard-cache/workspaces.cache.js";
 
 import { ClientDashboardRequiresAttentionCache } from "../../dashboard/client-dashboard-cache/requires-attention.cache.js";
@@ -113,73 +113,58 @@ export class ProjectCache {
   }
 
   static async invalidateRelatedDashboards(
-  projectId: string
+  projectId: string,
+  additionalProfessionalIds: string[] = []
 ): Promise<void> {
-  const project =
-    await prisma.project.findUnique({
-      where: {
-        id: projectId,
-      },
-
-      select: {
-        agreement: {
-          select: {
-            createdById: true,
-
-            participants: {
-              where: {
-                role: "PROFESSIONAL",
-              },
-
-              select: {
-                userId: true,
-              },
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+    select: {
+      agreement: {
+        select: {
+          createdById: true,
+          participants: {
+            where: {
+              role: "PROFESSIONAL",
+            },
+            select: {
+              userId: true,
             },
           },
         },
       },
-    });
+    },
+  });
 
   if (!project?.agreement) {
     return;
   }
 
-  const clientUserId =
-    project.agreement.createdById;
+  const clientUserId = project.agreement.createdById;
 
-  const professionalUserIds =
-    project.agreement.participants.map(
-      (participant) => participant.userId
-    );
+  const professionalUserIds = [
+    ...new Set([
+      ...project.agreement.participants.map(
+        (participant) => participant.userId
+      ),
+      ...additionalProfessionalIds,
+    ]),
+  ];
 
   await Promise.all([
-  // Client Dashboard
-  ClientDashboardOverviewCache.invalidate(
-    clientUserId
-  ),
+    ClientDashboardOverviewCache.invalidate(clientUserId),
 
-  ClientDashboardWorkspacesCache.invalidate(
-    clientUserId
-  ),
+    ClientDashboardWorkspacesCache.invalidate(clientUserId),
 
-  ClientDashboardRequiresAttentionCache.invalidate(
-    clientUserId
-  ),
+    ClientDashboardRequiresAttentionCache.invalidate(clientUserId),
 
+    ...professionalUserIds.flatMap((userId) => [
+      ProfessionalDashboardOverviewCache.invalidate(userId),
 
-  // Professional Dashboard
-  ...professionalUserIds.flatMap(
-    (userId) => [
-      ProfessionalDashboardOverviewCache.invalidate(
-        userId
-      ),
-
-      ProfessionalDashboardActiveProjectsCache.invalidate(
-        userId
-      ),
-    ]
-  ),
-]);
+      ProfessionalDashboardActiveProjectsCache.invalidate(userId),
+    ]),
+  ]);
 }
 
 
@@ -238,4 +223,73 @@ export class ProjectCache {
       await redis.del(keys);
     }
   }
+
+  static async syncProject(
+  projectId: string,
+  affectedProfessionalIds: string[] = []
+): Promise<void> {
+  // Read the committed database state, not an earlier transaction snapshot.
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      deletedAt: null,
+    },
+    include: {
+      agreement: {
+        include: {
+          participants: {
+            select: {
+              userId: true,
+              role: true,
+              invitationStatus: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!project) {
+    await this.invalidate(projectId);
+    return;
+  }
+
+  // Refresh the single-project cache with the latest database state.
+  await this.set(
+    projectId,
+    ProjectMapper.toResponse(project)
+  );
+
+  // Include current accepted professionals and users affected
+  // by this operation (including a professional just removed).
+  const currentProfessionalIds =
+    project.agreement?.participants
+      .filter(
+        (participant) =>
+          participant.role === "PROFESSIONAL" &&
+          participant.invitationStatus === "ACCEPTED"
+      )
+      .map((participant) => participant.userId) ?? [];
+
+  const professionalIds = [
+    ...new Set([
+      ...currentProfessionalIds,
+      ...affectedProfessionalIds,
+    ]),
+  ];
+
+  // Invalidate all derived caches that contain project information.
+  await Promise.all([
+    this.invalidateWorkspace(project.workspaceId),
+
+    ...professionalIds.map((userId) =>
+      this.invalidateProfessionalProjects(userId)
+    ),
+
+    this.invalidateRelatedDashboards(
+      projectId,
+      professionalIds
+    ),
+  ]);
+}
 }

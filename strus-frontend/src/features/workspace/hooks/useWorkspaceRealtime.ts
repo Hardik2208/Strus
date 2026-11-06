@@ -12,16 +12,42 @@ export const useWorkspaceRealtime = (workspaceId?: string) => {
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
-    // Ensure the socket is connected when a workspace page mounts.
     socketManager.connect();
 
-    // Reconcile REST data after initial connection or reconnection.
+    const invalidateWorkspaceLists = () => {
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.lists(),
+      });
+    };
+
+    const invalidateWorkspaceDetail = () => {
+      if (!workspaceId) return;
+
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.detail(workspaceId),
+      });
+
+      invalidateWorkspaceLists();
+    };
+
+    const invalidateWorkspaceMembers = () => {
+      if (!workspaceId) return;
+
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.members(workspaceId),
+      });
+
+      invalidateWorkspaceDetail();
+    };
+
     const unsubscribeStatus = socketManager.onStatusChange((status) => {
       if (status !== "connected") return;
 
       queryClient.invalidateQueries({
         queryKey: workspaceKeys.pendingInvitations(),
       });
+
+      invalidateWorkspaceLists();
 
       if (workspaceId) {
         queryClient.invalidateQueries({
@@ -35,57 +61,35 @@ export const useWorkspaceRealtime = (workspaceId?: string) => {
         queryClient.invalidateQueries({
           queryKey: workspaceKeys.invitations(workspaceId),
         });
-      } else {
-        queryClient.invalidateQueries({
-          queryKey: workspaceKeys.lists(),
-        });
       }
     });
 
-    // This hook can be mounted on the workspace list page.
     if (!workspaceId) {
       return () => {
         unsubscribeStatus();
       };
     }
 
-    const matchesWorkspace = (event: RealtimeEvent): boolean =>
+    const matchesWorkspace = (event: RealtimeEvent) =>
       event.data?.workspaceId === workspaceId;
 
-    const refreshWorkspaceMembers = () => {
-      queryClient.invalidateQueries({
-        queryKey: workspaceKeys.members(workspaceId),
-      });
-
-      // Workspace detail can contain the member count and current role.
-      queryClient.invalidateQueries({
-        queryKey: workspaceKeys.detail(workspaceId),
-      });
-
-      queryClient.invalidateQueries({
-        queryKey: workspaceKeys.lists(),
-      });
-    };
-
+    // Member joined: { workspaceId, userId }
     const unsubscribeMemberJoined = socketManager.subscribe(
       SOCKET_EVENTS.MEMBER_JOINED,
-      (event: RealtimeEvent) => {
+      (event) => {
         if (!matchesWorkspace(event)) return;
-
-        // Backend payload: { workspaceId, userId }
-        refreshWorkspaceMembers();
+        invalidateWorkspaceMembers();
       }
     );
 
+    // Member removed: { workspaceId, memberId }
     const unsubscribeMemberRemoved = socketManager.subscribe(
       SOCKET_EVENTS.MEMBER_REMOVED,
-      (event: RealtimeEvent) => {
+      (event) => {
         if (!matchesWorkspace(event)) return;
 
-        // Backend payload: { workspaceId, memberId }
-        refreshWorkspaceMembers();
+        invalidateWorkspaceMembers();
 
-        // If the current user was removed, they no longer have access.
         if (event.data?.memberId === user?.id) {
           queryClient.removeQueries({
             queryKey: workspaceKeys.detail(workspaceId),
@@ -99,52 +103,95 @@ export const useWorkspaceRealtime = (workspaceId?: string) => {
             queryKey: workspaceKeys.invitations(workspaceId),
           });
 
-          queryClient.invalidateQueries({
-            queryKey: workspaceKeys.lists(),
-          });
-
+          invalidateWorkspaceLists();
           window.location.assign("/workspaces");
         }
       }
     );
 
+    // Member left: { workspaceId, userId }
+    const unsubscribeMemberLeft = socketManager.subscribe(
+      SOCKET_EVENTS.MEMBER_LEFT,
+      (event) => {
+        if (!matchesWorkspace(event)) return;
+
+        invalidateWorkspaceMembers();
+
+        if (event.data?.userId === user?.id) {
+          queryClient.removeQueries({
+            queryKey: workspaceKeys.detail(workspaceId),
+          });
+
+          queryClient.removeQueries({
+            queryKey: workspaceKeys.members(workspaceId),
+          });
+
+          queryClient.removeQueries({
+            queryKey: workspaceKeys.invitations(workspaceId),
+          });
+
+          invalidateWorkspaceLists();
+          window.location.assign("/workspaces");
+        }
+      }
+    );
+
+    // Member role changed: { workspaceId, memberId, role }
     const unsubscribeMemberRoleUpdated = socketManager.subscribe(
       SOCKET_EVENTS.MEMBER_ROLE_UPDATED,
-      (event: RealtimeEvent) => {
+      (event) => {
         if (!matchesWorkspace(event)) return;
-
-        // Backend payload: { workspaceId, memberId, role }
-        refreshWorkspaceMembers();
+        invalidateWorkspaceMembers();
       }
     );
 
+    // Ownership transferred:
+    // { workspaceId, previousOwnerId, newOwnerId }
     const unsubscribeOwnershipTransferred = socketManager.subscribe(
       SOCKET_EVENTS.OWNERSHIP_TRANSFERRED,
-      (event: RealtimeEvent) => {
+      (event) => {
         if (!matchesWorkspace(event)) return;
+        invalidateWorkspaceMembers();
 
-        // Backend payload:
-        // { workspaceId, previousOwnerId, newOwnerId }
-        refreshWorkspaceMembers();
+        queryClient.invalidateQueries({
+          queryKey: workspaceKeys.invitations(workspaceId),
+        });
       }
     );
 
-    const unsubscribeInvitationDeclined = socketManager.subscribe(
-      SOCKET_EVENTS.INVITATION_DECLINED,
-      () => {
-        /*
-         * Backend payload: { invitationId }
-         *
-         * It does not contain workspaceId. Therefore, we cannot safely
-         * invalidate only this workspace's invitation query.
-         * Invalidate cached workspace invitation queries instead.
-         */
-        queryClient.invalidateQueries({
-          predicate: (query) =>
-            query.queryKey[0] === "workspaces" &&
-            query.queryKey[1] === "detail" &&
-            query.queryKey[3] === "invitations",
+    // Workspace metadata changed: { workspaceId }
+    const unsubscribeWorkspaceUpdated = socketManager.subscribe(
+      SOCKET_EVENTS.WORKSPACE_UPDATED,
+      (event) => {
+        if (!matchesWorkspace(event)) return;
+        invalidateWorkspaceDetail();
+      }
+    );
+
+    // Workspace deleted: { workspaceId }
+    const unsubscribeWorkspaceDeleted = socketManager.subscribe(
+      SOCKET_EVENTS.WORKSPACE_DELETED,
+      (event) => {
+        if (!matchesWorkspace(event)) return;
+
+        queryClient.removeQueries({
+          queryKey: workspaceKeys.detail(workspaceId),
         });
+
+        queryClient.removeQueries({
+          queryKey: workspaceKeys.members(workspaceId),
+        });
+
+        queryClient.removeQueries({
+          queryKey: workspaceKeys.invitations(workspaceId),
+        });
+
+        queryClient.removeQueries({
+          queryKey: workspaceKeys.audit(workspaceId),
+        });
+
+        invalidateWorkspaceLists();
+        window.location.assign("/workspaces");
       }
     );
 
@@ -152,9 +199,11 @@ export const useWorkspaceRealtime = (workspaceId?: string) => {
       unsubscribeStatus();
       unsubscribeMemberJoined();
       unsubscribeMemberRemoved();
+      unsubscribeMemberLeft();
       unsubscribeMemberRoleUpdated();
       unsubscribeOwnershipTransferred();
-      unsubscribeInvitationDeclined();
+      unsubscribeWorkspaceUpdated();
+      unsubscribeWorkspaceDeleted();
     };
   }, [queryClient, workspaceId, user?.id]);
 };

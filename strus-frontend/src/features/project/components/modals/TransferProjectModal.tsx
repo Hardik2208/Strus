@@ -24,8 +24,11 @@ export const TransferProjectModal: React.FC<TransferProjectModalProps> = ({
   if (!isOpen) return null;
 
   // Filter workspaces: Must be TEAM workspace, user must have OWNER/ADMIN role, and cannot be the current workspace
-  const eligibleWorkspaces = workspacesData?.workspaces?.filter(
-    (w) => w.workspaceType === 'TEAM' && w.id !== currentWorkspaceId && (w.role === 'OWNER' || w.role === 'ADMIN')
+  const eligibleWorkspaces =
+  workspacesData?.workspaces?.filter(
+    (workspace) =>
+      workspace.workspaceType === 'TEAM' &&
+      workspace.id !== currentWorkspaceId
   ) || [];
 
   const handleSubmit = async (e: React.FormEvent) => {

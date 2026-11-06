@@ -238,6 +238,7 @@ static async findEditableMessage(
   });
 }
 
+
 static async findDeletableMessage(
   messageId: string,
   userId: string
@@ -245,18 +246,12 @@ static async findDeletableMessage(
   return prisma.message.findFirst({
     where: {
       id: messageId,
-
-      senderId: userId,
-
       deletedAt: null,
-
       status: {
         not: MessageStatus.DELETED,
       },
-
       conversation: {
         status: ConversationStatus.ACTIVE,
-
         participants: {
           some: {
             userId,
@@ -264,20 +259,21 @@ static async findDeletableMessage(
         },
       },
     },
-
-    include: {
-  attachments: true,
-
-  conversation: {
     select: {
       id: true,
-      workspaceId: true,
-      projectId: true,
+      senderId: true,
+      conversationId: true,
+      conversation: {
+        select: {
+          id: true,
+          workspaceId: true,
+          projectId: true,
+        },
+      },
     },
-  },
-},
   });
 }
+
 
 static async findConversationMessages(
   conversationId: string,

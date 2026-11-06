@@ -41,13 +41,12 @@ export const VerifyEmailPage: React.FC = () => {
   const onSubmit = async (data: VerifyFormValues) => {
     try {
       await authService.verifyEmail({ email, otp: data.otp });
-      toast.success("Email verified successfully.");
-      
-      const storeProfileCompleted = useAuthStore.getState().profileCompleted;
-      if (storeProfileCompleted === false) {
-        navigate("/profile-onboarding-placeholder");
+      toast.success('Email verified successfully.');
+      const profileCompleted = useAuthStore.getState().profileCompleted;
+      if (profileCompleted === false) {
+        navigate('/profile/setup', { replace: true });
       } else {
-        navigate("/sessions");
+        navigate('/dashboard/client', { replace: true });
       }
     } catch (error: any) {
       toast.error(mapAuthError(error.code));

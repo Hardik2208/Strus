@@ -1,10 +1,11 @@
-import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
-import { socketManager } from "../socket-manager";
-import { SOCKET_EVENTS } from "../socket-events";
-import { workspaceKeys } from "../../../features/workspace/hooks/useWorkspace";
-import { agreementInvitationKeys } from "../../../features/agreement/hooks/useAgreementInvitations";
+import { socketManager } from '../socket-manager';
+import { SOCKET_EVENTS } from '../socket-events';
+
+import { workspaceKeys } from '../../../features/workspace/hooks/useWorkspace';
+import { agreementInvitationKeys } from '../../../features/agreement/hooks/useAgreementInvitations';
 
 export const useInvitationSockets = () => {
   const queryClient = useQueryClient();
@@ -12,55 +13,96 @@ export const useInvitationSockets = () => {
   useEffect(() => {
     socketManager.connect();
 
-    // Workspace invitation created or cancelled.
-    // These events are sent to the invited user's personal room.
-    const unsubscribeWorkspaceCreated = socketManager.subscribe(
-      SOCKET_EVENTS.INVITATION_CREATED,
-      () => {
-        queryClient.invalidateQueries({
-          queryKey: workspaceKeys.pendingInvitations(),
-        });
+    const invalidatePendingInvitations = () => {
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.pendingInvitations(),
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: agreementInvitationKeys.all,
+      });
+    };
+
+    const invalidateWorkspaceInvitations = (workspaceId: string) => {
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.invitations(workspaceId),
+      });
+    };
+
+    // Reconcile pending invitation lists after reconnecting.
+    const unsubscribeStatus = socketManager.onStatusChange((status) => {
+      if (status === 'connected') {
+        invalidatePendingInvitations();
       }
+    });
+
+    // Workspace invitation created.
+    const unsubscribeInvitationCreated = socketManager.subscribe(
+      SOCKET_EVENTS.INVITATION_CREATED,
+      (event) => {
+        const workspaceId = event.data?.workspaceId;
+
+        if (workspaceId) {
+          invalidateWorkspaceInvitations(workspaceId);
+        } else {
+          invalidatePendingInvitations();
+        }
+      },
     );
 
-    const unsubscribeWorkspaceCancelled = socketManager.subscribe(
+    // Workspace invitation cancelled.
+    const unsubscribeInvitationCancelled = socketManager.subscribe(
       SOCKET_EVENTS.INVITATION_CANCELLED,
-      () => {
-        queryClient.invalidateQueries({
-          queryKey: workspaceKeys.pendingInvitations(),
-        });
-      }
+      (event) => {
+        const workspaceId = event.data?.workspaceId;
+
+        if (workspaceId) {
+          invalidateWorkspaceInvitations(workspaceId);
+        } else {
+          invalidatePendingInvitations();
+        }
+      },
     );
 
     // Workspace invitation declined.
-    // Backend emits this to the workspace room with { invitationId }.
-    const unsubscribeWorkspaceDeclined = socketManager.subscribe(
+    const unsubscribeInvitationDeclined = socketManager.subscribe(
       SOCKET_EVENTS.INVITATION_DECLINED,
-      () => {
-        queryClient.invalidateQueries({
-          predicate: (query) =>
-            query.queryKey[0] === "workspaces" &&
-            query.queryKey[1] === "detail" &&
-            query.queryKey[3] === "invitations",
-        });
-      }
+      (event) => {
+        const workspaceId = event.data?.workspaceId;
+
+        if (workspaceId) {
+          invalidateWorkspaceInvitations(workspaceId);
+        }
+      },
     );
 
-    // Agreement invitation created.
-    const unsubscribeAgreementCreated = socketManager.subscribe(
+    // Agreement invitation created: sent to the invited user's personal room.
+    const unsubscribeAgreementInvitationCreated = socketManager.subscribe(
       SOCKET_EVENTS.AGREEMENT_INVITATION_CREATED,
       () => {
         queryClient.invalidateQueries({
           queryKey: agreementInvitationKeys.all,
         });
-      }
+      },
+    );
+
+    // Agreement invitation withdrawn: sent to the invited user's personal room.
+    const unsubscribeAgreementInvitationWithdrawn = socketManager.subscribe(
+      SOCKET_EVENTS.AGREEMENT_INVITATION_WITHDRAWN,
+      () => {
+        queryClient.invalidateQueries({
+          queryKey: agreementInvitationKeys.all,
+        });
+      },
     );
 
     return () => {
-      unsubscribeWorkspaceCreated();
-      unsubscribeWorkspaceCancelled();
-      unsubscribeWorkspaceDeclined();
-      unsubscribeAgreementCreated();
+      unsubscribeStatus();
+      unsubscribeInvitationCreated();
+      unsubscribeInvitationCancelled();
+      unsubscribeInvitationDeclined();
+      unsubscribeAgreementInvitationCreated();
+      unsubscribeAgreementInvitationWithdrawn();
     };
   }, [queryClient]);
 };

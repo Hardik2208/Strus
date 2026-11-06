@@ -61,26 +61,29 @@ export class AgreementParticipantRepository {
   // ==================================================
 
   static async findById(
-    id: string
-  ) {
-    return prisma.agreementParticipant.findUnique({
-      where: {
-        id,
-      },
-      include: {
-        user: {
-          include: {
-            profile: true,
-          },
-        },
-        agreement: {
-          include: {
-            project: true,
-          },
+  id: string,
+  tx?: Prisma.TransactionClient
+) {
+  const db = tx ?? prisma;
+
+  return db.agreementParticipant.findUnique({
+    where: {
+      id,
+    },
+    include: {
+      user: {
+        include: {
+          profile: true,
         },
       },
-    });
-  }
+      agreement: {
+        include: {
+          project: true,
+        },
+      },
+    },
+  });
+}
 
   // ==================================================
   // Find By Agreement
@@ -172,16 +175,19 @@ export class AgreementParticipantRepository {
   // ==================================================
 
   static async countAcceptedProfessionals(
-    agreementId: string
-  ) {
-    return prisma.agreementParticipant.count({
-      where: {
-        agreementId,
-        invitationStatus:
-          AgreementInvitationStatus.ACCEPTED,
-      },
-    });
-  }
+  agreementId: string,
+  tx?: Prisma.TransactionClient
+) {
+  const db = tx ?? prisma;
+
+  return db.agreementParticipant.count({
+    where: {
+      agreementId,
+      invitationStatus:
+        AgreementInvitationStatus.ACCEPTED,
+    },
+  });
+}
 
   // ==================================================
   // User Invitations
@@ -210,9 +216,10 @@ export class AgreementParticipantRepository {
 
 
 static async findForConversationSync(
+  tx: Prisma.TransactionClient,
   agreementId: string
 ) {
-  return prisma.agreement.findUnique({
+  return tx.agreement.findUnique({
     where: {
       id: agreementId,
     },

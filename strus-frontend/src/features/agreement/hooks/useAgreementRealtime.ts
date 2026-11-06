@@ -1,93 +1,162 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+
 import { socketManager } from '../../../core/realtime/socket-manager';
+import { SOCKET_EVENTS } from '../../../core/realtime/socket-events';
+
 import { agreementKeys } from './useAgreementQueries';
 import { projectQueryKeys } from '../../project/hooks/useProjectQueries';
-import toast from 'react-hot-toast';
 
 export const useAgreementRealtime = (projectId: string) => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId) {
+      return;
+    }
 
-    // Connect to socket if not already connected
     socketManager.connect();
 
-    // Reconnection Reconciliation:
-    // If the socket reconnects, we may have missed events. We must reconcile via REST.
-    const unsubStatus = socketManager.onStatusChange((status) => {
+    const invalidateAgreementDetails = () => {
+      queryClient.invalidateQueries({
+        queryKey: agreementKeys.details(projectId),
+      });
+    };
+
+    const invalidateParticipants = () => {
+      queryClient.invalidateQueries({
+        queryKey: agreementKeys.participants(projectId),
+      });
+    };
+
+    const invalidateAudits = () => {
+      queryClient.invalidateQueries({
+        queryKey: agreementKeys.audits(projectId),
+      });
+    };
+
+    const invalidateProject = () => {
+      queryClient.invalidateQueries({
+        queryKey: projectQueryKeys.detail(projectId),
+      });
+    };
+
+    const invalidateAgreementState = () => {
+      invalidateAgreementDetails();
+      invalidateParticipants();
+      invalidateAudits();
+      invalidateProject();
+    };
+
+    // Socket.IO does not replay events missed while disconnected.
+    // Reconcile all project-level Agreement state through REST.
+    const unsubscribeStatus = socketManager.onStatusChange((status) => {
       if (status === 'connected') {
-        queryClient.invalidateQueries({ queryKey: agreementKeys.details(projectId) });
-        queryClient.invalidateQueries({ queryKey: agreementKeys.participants(projectId) });
+        invalidateAgreementState();
       }
     });
 
-    // agreement:created
-    const unsubCreated = socketManager.subscribe('agreement:created', (event) => {
-      if (event.data.projectId === projectId) {
-        queryClient.invalidateQueries({ queryKey: agreementKeys.details(projectId) });
-        queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId) });
-      }
-    });
+    const unsubscribeCreated = socketManager.subscribe(
+      SOCKET_EVENTS.AGREEMENT_CREATED,
+      (event) => {
+        if (event.data?.projectId !== projectId) {
+          return;
+        }
 
-    // agreement:updated
-    const unsubUpdated = socketManager.subscribe('agreement:updated', (event) => {
-      if (event.data.projectId === projectId) {
-        queryClient.invalidateQueries({ queryKey: agreementKeys.details(projectId) });
-      }
-    });
+        invalidateAgreementState();
+      },
+    );
 
-    // agreement:invitation:created
-    const unsubInvCreated = socketManager.subscribe('agreement:invitation:created', (event) => {
-      if (event.data.projectId === projectId) {
-        queryClient.invalidateQueries({ queryKey: agreementKeys.participants(projectId) });
-        toast.success(`You have a new agreement invitation!`, {
-          icon: '📫'
+    const unsubscribeUpdated = socketManager.subscribe(
+      SOCKET_EVENTS.AGREEMENT_UPDATED,
+      (event) => {
+        if (event.data?.projectId !== projectId) {
+          return;
+        }
+
+        invalidateAgreementDetails();
+        invalidateAudits();
+        invalidateProject();
+      },
+    );
+
+    const unsubscribeInvitationCreated = socketManager.subscribe(
+      SOCKET_EVENTS.AGREEMENT_INVITATION_CREATED,
+      (event) => {
+        if (event.data?.projectId !== projectId) {
+          return;
+        }
+
+        invalidateParticipants();
+        invalidateAudits();
+
+        toast.success('You have a new agreement invitation!', {
+          icon: '📫',
         });
-      }
-    });
+      },
+    );
 
-    // agreement:invitation:accepted
-    const unsubInvAccepted = socketManager.subscribe('agreement:invitation:accepted', (event) => {
-      if (event.data.projectId === projectId) {
-        queryClient.invalidateQueries({ queryKey: agreementKeys.participants(projectId) });
-        queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId) });
-      }
-    });
+    const unsubscribeInvitationAccepted = socketManager.subscribe(
+      SOCKET_EVENTS.AGREEMENT_INVITATION_ACCEPTED,
+      (event) => {
+        if (event.data?.projectId !== projectId) {
+          return;
+        }
 
-    // agreement:invitation:declined
-    const unsubInvDeclined = socketManager.subscribe('agreement:invitation:declined', (event) => {
-      if (event.data.projectId === projectId) {
-        queryClient.invalidateQueries({ queryKey: agreementKeys.participants(projectId) });
-        queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId) });
-      }
-    });
+        invalidateParticipants();
+        invalidateAudits();
+        invalidateProject();
+      },
+    );
 
-    // agreement:invitation:withdrawn
-    const unsubInvWithdrawn = socketManager.subscribe('agreement:invitation:withdrawn', (event) => {
-      if (event.data.projectId === projectId) {
-        queryClient.invalidateQueries({ queryKey: agreementKeys.participants(projectId) });
-      }
-    });
+    const unsubscribeInvitationDeclined = socketManager.subscribe(
+      SOCKET_EVENTS.AGREEMENT_INVITATION_DECLINED,
+      (event) => {
+        if (event.data?.projectId !== projectId) {
+          return;
+        }
 
-    // agreement:participant:removed
-    const unsubPartRemoved = socketManager.subscribe('agreement:participant:removed', (event) => {
-      if (event.data.projectId === projectId) {
-        queryClient.invalidateQueries({ queryKey: agreementKeys.participants(projectId) });
-        queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId) });
-      }
-    });
+        invalidateParticipants();
+        invalidateAudits();
+        invalidateProject();
+      },
+    );
+
+    const unsubscribeInvitationWithdrawn = socketManager.subscribe(
+      SOCKET_EVENTS.AGREEMENT_INVITATION_WITHDRAWN,
+      (event) => {
+        if (event.data?.projectId !== projectId) {
+          return;
+        }
+
+        invalidateParticipants();
+        invalidateAudits();
+      },
+    );
+
+    const unsubscribeParticipantRemoved = socketManager.subscribe(
+      SOCKET_EVENTS.AGREEMENT_PARTICIPANT_REMOVED,
+      (event) => {
+        if (event.data?.projectId !== projectId) {
+          return;
+        }
+
+        invalidateParticipants();
+        invalidateAudits();
+        invalidateProject();
+      },
+    );
 
     return () => {
-      unsubStatus();
-      unsubCreated();
-      unsubUpdated();
-      unsubInvCreated();
-      unsubInvAccepted();
-      unsubInvDeclined();
-      unsubInvWithdrawn();
-      unsubPartRemoved();
+      unsubscribeStatus();
+      unsubscribeCreated();
+      unsubscribeUpdated();
+      unsubscribeInvitationCreated();
+      unsubscribeInvitationAccepted();
+      unsubscribeInvitationDeclined();
+      unsubscribeInvitationWithdrawn();
+      unsubscribeParticipantRemoved();
     };
   }, [projectId, queryClient]);
 };

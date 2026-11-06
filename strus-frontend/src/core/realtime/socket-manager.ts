@@ -8,30 +8,39 @@ type EventHandler = (event: RealtimeEvent) => void;
 class SocketManager {
   private socket: Socket | null = null;
   private status: SocketStatus = "disconnected";
-  
-  private subscribers: Map<string, Set<EventHandler>> = new Map();
-  private processedEventIds: Set<string> = new Set();
-  
-  private statusListeners: Set<(status: SocketStatus) => void> = new Set();
 
-  public connect() {
-    if (this.socket?.connected) {
+  private subscribers = new Map<string, Set<EventHandler>>();
+  private processedEventIds = new Set<string>();
+  private statusListeners = new Set<(status: SocketStatus) => void>();
+
+  public connect(): void {
+    const token = tokenManager.getAccessToken();
+
+    if (!token) {
       return;
     }
 
-    const token = tokenManager.getAccessToken();
-    if (!token) {
-      return; // Cannot connect without auth
+    // Prevent creating another socket while the existing socket
+    // is connected, connecting, or attempting reconnection.
+    if (this.socket?.connected || this.socket?.active) {
+      return;
     }
 
     this.setStatus("connecting");
 
-    // Standard base URL without `/api/v1`
-    const baseUrl = env.API_BASE_URL.replace(/\/api\/v1$/, '');
+    // Reuse an existing inactive socket instead of creating another one.
+    if (this.socket) {
+      this.socket.connect();
+      return;
+    }
 
-    this.socket = io(baseUrl, {
-      auth: (cb) => {
-        cb({ token: tokenManager.getAccessToken() });
+    const baseUrl = env.API_BASE_URL.replace(/\/api\/v1$/, "");
+
+    const socket = io(baseUrl, {
+      auth: (callback) => {
+        callback({
+          token: tokenManager.getAccessToken(),
+        });
       },
       transports: ["websocket", "polling"],
       reconnection: true,
@@ -40,103 +49,138 @@ class SocketManager {
       reconnectionDelayMax: 30000,
     });
 
-    this.socket.on("connect", () => {
+    this.socket = socket;
+
+    socket.on("connect", () => {
       this.setStatus("connected");
     });
 
-    this.socket.on("disconnect", () => {
+    socket.on("disconnect", () => {
       this.setStatus("disconnected");
     });
 
-    this.socket.on("connect_error", () => {
-      // Intentionally omitting console.error to avoid leaking transport details
+    socket.on("connect_error", () => {
       this.setStatus("reconnecting");
     });
 
-    // Handle incoming events from the server
-    // The server emits named events or generic "event" payloads depending on backend implementation
-    // For Strus, we listen to a catch-all if possible, or bind explicitly to documented events.
-    this.socket.onAny((eventName, ...args) => {
+    socket.onAny((eventName, ...args) => {
       try {
-        const payload = args[0] || {};
+        const payload = args[0] ?? {};
+
         const event: RealtimeEvent = {
-          id: payload.eventId || crypto.randomUUID(), // Ensure an ID exists for deduplication
+          id: payload?.eventId || crypto.randomUUID(),
           type: eventName,
           data: payload,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
+
         this.handleEvent(event);
-      } catch (e) {
-        // Intentionally silent to prevent leaking payload parsing errors
+      } catch {
+        // Ignore malformed socket payloads.
       }
     });
   }
 
-  public disconnect() {
+  public disconnect(): void {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
-    
+
     this.setStatus("disconnected");
   }
 
-  public subscribe(eventType: string, handler: EventHandler): () => void {
+    public emit(eventType: string, payload: unknown): void {
+    if (!this.socket?.connected) {
+      return;
+    }
+
+    this.socket.emit(eventType, payload);
+  }
+  
+  public subscribe(
+    eventType: string,
+    handler: EventHandler
+  ): () => void {
     if (!this.subscribers.has(eventType)) {
       this.subscribers.set(eventType, new Set());
     }
+
     this.subscribers.get(eventType)!.add(handler);
 
-    // Return cleanup function
     return () => {
       const handlers = this.subscribers.get(eventType);
-      if (handlers) {
-        handlers.delete(handler);
-        if (handlers.size === 0) {
-          this.subscribers.delete(eventType);
-        }
+
+      if (!handlers) return;
+
+      handlers.delete(handler);
+
+      if (handlers.size === 0) {
+        this.subscribers.delete(eventType);
       }
     };
   }
 
-  public onStatusChange(listener: (status: SocketStatus) => void): () => void {
+  public onStatusChange(
+    listener: (status: SocketStatus) => void
+  ): () => void {
     this.statusListeners.add(listener);
     listener(this.status);
+
     return () => {
       this.statusListeners.delete(listener);
     };
   }
 
-  private handleEvent(event: RealtimeEvent) {
-    if (!event || !event.type) return;
+  private handleEvent(event: RealtimeEvent): void {
+    if (!event?.type) return;
 
-    // Deduplication
     if (event.id) {
       if (this.processedEventIds.has(event.id)) {
         return;
       }
+
       this.processedEventIds.add(event.id);
 
-      // Keep memory bounded
+      // Keep the deduplication cache bounded.
       if (this.processedEventIds.size > 1000) {
         const iterator = this.processedEventIds.values();
+
         for (let i = 0; i < 500; i++) {
-          this.processedEventIds.delete(iterator.next().value!);
+          const oldestId = iterator.next().value;
+          if (oldestId) {
+            this.processedEventIds.delete(oldestId);
+          }
         }
       }
     }
 
     const handlers = this.subscribers.get(event.type);
-    if (handlers) {
-      handlers.forEach(handler => handler(event));
-    }
+
+    if (!handlers) return;
+
+    // One failing subscriber must not block other subscribers.
+    handlers.forEach((handler) => {
+      try {
+        handler(event);
+      } catch {
+        // Keep other event subscribers operational.
+      }
+    });
   }
 
-  private setStatus(status: SocketStatus) {
-    if (this.status !== status) {
-      this.status = status;
-      this.statusListeners.forEach(listener => listener(status));
-    }
+  private setStatus(status: SocketStatus): void {
+    if (this.status === status) return;
+
+    this.status = status;
+
+    this.statusListeners.forEach((listener) => {
+      try {
+        listener(status);
+      } catch {
+        // Status listener failures must not affect the socket.
+      }
+    });
   }
 }
 

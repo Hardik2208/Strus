@@ -77,8 +77,8 @@ export interface WorkspaceAuditLog {
     lastName: string;
     avatarUrl: string | null;
   };
-  entityId: string;
-  metadata: any;
+  entityId: string | null;
+  metadata: unknown;
   createdAt: string;
 }
 

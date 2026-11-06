@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 
@@ -13,11 +12,14 @@ import { ActivityTab } from '../components/tabs/ActivityTab';
 import { SettingsTab } from '../components/tabs/SettingsTab';
 import { WorkspaceProjectsTab } from '../components/tabs/WorkspaceProjectsTab';
 
+import { WorkspaceCommunicationTab } from '../../communication/pages/WorkspaceCommunicationTab';
+
 import { Button } from '../../../components/ui/Button';
 
 type WorkspaceTab =
   | 'overview'
   | 'projects'
+  | 'communication'
   | 'members'
   | 'invitations'
   | 'activity'
@@ -39,12 +41,12 @@ export const WorkspaceDetailPage: React.FC = () => {
 
   const isPersonal = workspace?.workspaceType === 'PERSONAL';
   const isOwner = workspace?.myRole === 'OWNER';
-
   const memberRole = workspace?.myRole;
 
   const tabs: { id: WorkspaceTab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'projects', label: 'Projects' },
+    { id: 'communication', label: 'Communication' },
 
     ...(!isPersonal
       ? [{ id: 'members' as const, label: 'Members' }]
@@ -58,7 +60,6 @@ export const WorkspaceDetailPage: React.FC = () => {
     { id: 'settings', label: 'Settings' },
   ];
 
-  // All hooks must execute on every render, before conditional returns.
   useEffect(() => {
     const activeTabAvailable = tabs.some(
       (tab) => tab.id === activeTab
@@ -128,7 +129,12 @@ export const WorkspaceDetailPage: React.FC = () => {
 
   if (!memberRole) {
     return (
-      <div style={{ padding: 'var(--space-24)', textAlign: 'center' }}>
+      <div
+        style={{
+          padding: 'var(--space-24)',
+          textAlign: 'center',
+        }}
+      >
         Unable to determine your workspace permissions. Please refresh.
       </div>
     );
@@ -190,6 +196,12 @@ export const WorkspaceDetailPage: React.FC = () => {
         {activeTab === 'projects' && (
           <WorkspaceProjectsTab
             workspace={workspace}
+            memberRole={memberRole}
+          />
+        )}
+
+        {activeTab === 'communication' && (
+          <WorkspaceCommunicationTab
             memberRole={memberRole}
           />
         )}

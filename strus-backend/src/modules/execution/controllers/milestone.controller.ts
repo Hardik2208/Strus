@@ -8,7 +8,7 @@ import { MilestoneCache } from "../cache/milestone.cache.js";
 import type { AuthenticatedRequest } from "../../auth/interfaces/auth.interface.js";
 import { ExecutionPublisher } from "../../event/publishers/execution.publisher.js";
 import type { CreateExecutionPlanDto } from "../dtos/create-execution-plan.dto.js";
-
+import { ProjectCache } from "../../project/cache/project.cache.js";
 import { MilestoneService } from "../services/execution-plan.service.js";
 import { ExecutionMapper } from "../mappers/execution.mapper.js";
 
@@ -64,6 +64,8 @@ await Promise.all(
         )
     )
 );
+
+await ProjectCache.syncProject(projectId);
 
       res.status(201).json({
         success: true,
@@ -164,6 +166,8 @@ await Promise.all(
 
 });
 
+await ProjectCache.syncProject(projectId);
+
       await MilestoneCache.invalidateExecutionPlan(
     projectId
 );
@@ -218,6 +222,8 @@ await Promise.all(
             userId
           )
       );
+
+      await ProjectCache.syncProject(projectId);
 
       await MilestoneCache.invalidateExecutionPlan(
     projectId

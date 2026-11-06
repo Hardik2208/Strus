@@ -306,9 +306,10 @@ export class AgreementParticipantService {
   // ==================================================
 
   const participant =
-    await AgreementParticipantRepository.findById(
-      participantId
-    );
+  await AgreementParticipantRepository.findById(
+    participantId,
+    tx
+  );
 
   if (
     !participant ||
@@ -406,9 +407,10 @@ export class AgreementParticipantService {
 
   if (accepted) {
   const acceptedCount =
-    await AgreementParticipantRepository.countAcceptedProfessionals(
-      agreement.id
-    );
+  await AgreementParticipantRepository.countAcceptedProfessionals(
+    agreement.id,
+    tx
+  );
 
   if (
     acceptedCount > 0 &&
@@ -448,7 +450,8 @@ export class AgreementParticipantService {
 
   const participantWithAgreement =
   await AgreementParticipantRepository.findById(
-    updatedParticipant.id
+    updatedParticipant.id,
+    tx
   );
 
 if (!participantWithAgreement) {
@@ -503,9 +506,10 @@ return participantWithAgreement;
   // ==================================================
 
   const participant =
-    await AgreementParticipantRepository.findById(
-      participantId
-    );
+  await AgreementParticipantRepository.findById(
+    participantId,
+    tx
+  );
 
   if (
     !participant ||
@@ -579,7 +583,8 @@ return participantWithAgreement;
 
   const acceptedCount =
     await AgreementParticipantRepository.countAcceptedProfessionals(
-      agreement.id
+      agreement.id,
+      tx
     );
 
   if (
@@ -651,7 +656,8 @@ static async withdrawInvitation(
 
   const participant =
     await AgreementParticipantRepository.findById(
-      participantId
+      participantId,
+      tx
     );
 
   if (

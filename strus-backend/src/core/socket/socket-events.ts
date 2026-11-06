@@ -102,4 +102,8 @@ NEGOTIATION_DECLINED:
 NEGOTIATION_EXPIRED:
   "negotiation:expired",
 
+  WORKSPACE_UPDATED: "workspace.updated",
+WORKSPACE_DELETED: "workspace.deleted",
+MEMBER_LEFT: "workspace.member.left",
+
 } as const;

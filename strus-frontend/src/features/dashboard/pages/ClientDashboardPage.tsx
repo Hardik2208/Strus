@@ -56,22 +56,22 @@ export const ClientDashboardPage: React.FC = () => {
   // Client quick actions are static navigation links.
   // There is no documented Client Quick Actions API.
   const clientQuickActions = [
-    {
-      key: 'projects',
-      label: 'Projects',
-      route: '/projects',
-    },
-    {
-      key: 'agreements',
-      label: 'Agreements',
-      route: '/agreements',
-    },
-    {
-      key: 'workspaces',
-      label: 'Workspaces',
-      route: '/workspaces',
-    },
-  ];
+  {
+    key: 'projects',
+    label: 'Projects',
+    route: '/workspaces',
+  },
+  {
+    key: 'agreements',
+    label: 'Agreements',
+    route: '/workspaces',
+  },
+  {
+    key: 'workspaces',
+    label: 'Workspaces',
+    route: '/workspaces',
+  },
+];
 
   const overviewMetrics = overview
     ? [

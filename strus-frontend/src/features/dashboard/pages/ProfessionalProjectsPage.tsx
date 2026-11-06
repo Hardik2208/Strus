@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useProfessionalProjects } from '../../project/hooks/useProjectQueries';
 import { ProfessionalProjectCard } from '../components/ProfessionalProjectCard';
-import { type ProjectStatus } from '../../project/types/project.types';
 import { Search } from 'lucide-react';
+import {
+  type ProjectStatus,
+  type ProjectSortField,
+} from '../../project/types/project.types';
 
 export const ProfessionalProjectsPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | ''>('');
+  const [sortBy, setSortBy] =
+  useState<ProjectSortField>('createdAt');
+
+const [sortOrder, setSortOrder] =
+  useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -22,8 +30,8 @@ export const ProfessionalProjectsPage: React.FC = () => {
     limit: 20,
     search: debouncedSearch || undefined,
     status: statusFilter ? statusFilter : undefined,
-    sort: 'createdAt',
-    order: 'desc'
+    sort: sortBy,
+    order: sortOrder
   });
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {

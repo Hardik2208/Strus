@@ -61,6 +61,11 @@ export class ProjectService {
 
       });
 
+      await ProjectConversationService.ensureInitialized(
+  tx,
+  project.id
+);
+
     await ProjectAuditRepository.create(tx, {
       projectId: project.id,
 
@@ -450,15 +455,9 @@ break;
   }
 
   await ProjectConversationService.activate(
-    tx,
-    projectId
-  );
-
-
-  await ProjectConversationService.syncParticipants(
-    tx,
-    agreement.id
-  );
+  tx,
+  projectId
+);
 
   break;
   case ProjectStatus.COMPLETED:

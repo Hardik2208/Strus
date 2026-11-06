@@ -6,7 +6,7 @@ import { CreateProjectModal } from '../../../project/components/modals/CreatePro
 import { Button } from '../../../../components/ui/Button';
 import { Input } from '../../../../components/ui/Input';
 import type { WorkspaceDetail } from '../../types/workspace.types';
-import type { Project, ProjectStatus } from '../../../project/types/project.types';
+import type { Project, ProjectSortField, ProjectStatus } from '../../../project/types/project.types';
 import { Plus, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -23,6 +23,12 @@ export const WorkspaceProjectsTab: React.FC<WorkspaceProjectsTabProps> = ({ work
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | ''>('');
   
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const [sortBy, setSortBy] =
+  useState<ProjectSortField>('createdAt');
+
+const [sortOrder, setSortOrder] =
+  useState<'asc' | 'desc'>('desc');
   
   const navigate = useNavigate();
 
@@ -39,7 +45,9 @@ export const WorkspaceProjectsTab: React.FC<WorkspaceProjectsTabProps> = ({ work
       page, 
       limit, 
       search: debouncedSearch || undefined,
-      status: statusFilter || undefined 
+      status: statusFilter || undefined,
+      sort: sortBy,
+    order: sortOrder,
     }
   );
 
@@ -102,11 +110,53 @@ export const WorkspaceProjectsTab: React.FC<WorkspaceProjectsTabProps> = ({ work
           }}
         >
           <option value="">All Statuses</option>
-          <option value="DRAFT">Draft</option>
-          <option value="ACTIVE">Active</option>
-          <option value="COMPLETED">Completed</option>
-          <option value="CANCELLED">Cancelled</option>
+<option value="DRAFT">Draft</option>
+<option value="ACTIVE">Active</option>
+<option value="COMPLETED">Completed</option>
+<option value="CANCELLED">Cancelled</option>
+<option value="MUTUALLY_TERMINATED">Mutually Terminated</option>
+<option value="DISPUTE_TERMINATED">Dispute Terminated</option>
         </select>
+
+        <select
+  value={sortBy}
+  onChange={(e) => {
+    setSortBy(e.target.value as ProjectSortField);
+    setPage(1);
+  }}
+  style={{
+    padding: '0 var(--space-12)',
+    borderRadius: '6px',
+    border: '1px solid var(--color-border)',
+    backgroundColor: 'var(--color-surface)',
+    fontSize: 'var(--text-sm)',
+    color: 'var(--color-text-primary)',
+  }}
+>
+  <option value="createdAt">Created Date</option>
+  <option value="title">Project Title</option>
+  <option value="expectedStartDate">Expected Start Date</option>
+  <option value="expectedCompletionDate">Expected Completion Date</option>
+</select>
+
+<select
+  value={sortOrder}
+  onChange={(e) => {
+    setSortOrder(e.target.value as 'asc' | 'desc');
+    setPage(1);
+  }}
+  style={{
+    padding: '0 var(--space-12)',
+    borderRadius: '6px',
+    border: '1px solid var(--color-border)',
+    backgroundColor: 'var(--color-surface)',
+    fontSize: 'var(--text-sm)',
+    color: 'var(--color-text-primary)',
+  }}
+>
+  <option value="desc">Descending</option>
+  <option value="asc">Ascending</option>
+</select>
       </div>
 
       {isLoading ? (

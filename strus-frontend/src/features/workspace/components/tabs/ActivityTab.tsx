@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { useWorkspaceAudit } from '../../hooks/useWorkspace';
 import type {
@@ -8,47 +6,73 @@ import type {
 } from '../../types/workspace.types';
 import { Button } from '../../../../components/ui/Button';
 
-const formatActionText = (action: string, log: WorkspaceAuditLog) => {
-  const meta = log.metadata || {};
+const getMetadata = (
+  metadata: unknown
+): Record<string, unknown> => {
+  if (
+    !metadata ||
+    typeof metadata !== 'object' ||
+    Array.isArray(metadata)
+  ) {
+    return {};
+  }
 
-  switch (action) {
+  return metadata as Record<string, unknown>;
+};
+
+const formatActionText = (log: WorkspaceAuditLog): string => {
+  const metadata = getMetadata(log.metadata);
+
+  switch (log.action) {
     case 'WORKSPACE_CREATED':
       return 'created this workspace';
+
     case 'WORKSPACE_UPDATED':
       return 'updated workspace settings';
-    case 'MEMBER_INVITED':
-      return `invited ${meta.identifier || 'a member'}`;
+
+    case 'WORKSPACE_DELETED':
+      return 'deleted this workspace';
+
+    case 'INVITATION_CREATED':
+      return `invited user ${metadata.invitedUserId || ''}`.trim();
+
     case 'INVITATION_ACCEPTED':
-      return 'accepted an invitation';
+      return 'accepted a workspace invitation';
+
     case 'INVITATION_DECLINED':
-      return 'declined an invitation';
+      return 'declined a workspace invitation';
+
     case 'INVITATION_CANCELLED':
-      return 'cancelled an invitation';
+      return 'cancelled a workspace invitation';
+
     case 'MEMBER_JOINED':
-      return `${meta.username || 'A member'} joined the workspace`;
-    case 'MEMBER_LEFT':
-      return `${meta.username || 'A member'} left the workspace`;
+      return 'joined the workspace';
+
     case 'MEMBER_REMOVED':
-      return `${meta.username || 'A member'} was removed from the workspace`;
-    case 'MEMBER_ROLE_UPDATED': {
-      const user = meta.username || 'A member';
-      const from = meta.previousRole || 'unknown';
-      const to = meta.newRole || 'unknown';
-      return `${user}'s role changed from ${from} to ${to}`;
-    }
+      return log.actor?.id === log.entityId
+        ? 'left the workspace'
+        : 'removed a workspace member';
+
+    case 'MEMBER_PROMOTED':
+      return 'promoted a member to ADMIN';
+
+    case 'MEMBER_DEMOTED':
+      return 'changed a member role to MEMBER';
+
     case 'OWNERSHIP_TRANSFERRED':
       return `transferred workspace ownership to ${
-        meta.newOwnerUsername || 'a member'
+        metadata.newOwnerId || 'another member'
       }`;
-    case 'WORKSPACE_DELETED':
-      return 'deleted the workspace';
+
     default:
-      return action.replace(/_/g, ' ').toLowerCase();
+      return log.action.replace(/_/g, ' ').toLowerCase();
   }
 };
 
 const formatMetadataValue = (value: unknown): string => {
-  if (value === null || value === undefined) return '—';
+  if (value === null || value === undefined) {
+    return '—';
+  }
 
   if (typeof value === 'boolean') {
     return value ? 'Yes' : 'No';
@@ -62,15 +86,7 @@ const formatMetadataValue = (value: unknown): string => {
 };
 
 const getMetadataEntries = (metadata: unknown) => {
-  if (
-    !metadata ||
-    typeof metadata !== 'object' ||
-    Array.isArray(metadata)
-  ) {
-    return [];
-  }
-
-  return Object.entries(metadata as Record<string, unknown>).filter(
+  return Object.entries(getMetadata(metadata)).filter(
     ([, value]) => value !== null && value !== undefined
   );
 };
@@ -81,9 +97,9 @@ const formatMetadataLabel = (key: string) =>
     .replace(/_/g, ' ')
     .replace(/^./, (char) => char.toUpperCase());
 
-export const ActivityTab: React.FC<{ workspace: WorkspaceDetail }> = ({
-  workspace,
-}) => {
+export const ActivityTab: React.FC<{
+  workspace: WorkspaceDetail;
+}> = ({ workspace }) => {
   const [page, setPage] = useState(1);
 
   const {
@@ -92,6 +108,7 @@ export const ActivityTab: React.FC<{ workspace: WorkspaceDetail }> = ({
     isError,
     error,
     refetch,
+    isFetching,
   } = useWorkspaceAudit(workspace.id, page, 20);
 
   if (isLoading) {
@@ -109,7 +126,6 @@ export const ActivityTab: React.FC<{ workspace: WorkspaceDetail }> = ({
 
   if (isError) {
     const errorMessage =
-      (error as any)?.response?.data?.message ||
       (error as any)?.message ||
       'There was a problem communicating with the server.';
 
@@ -218,8 +234,10 @@ export const ActivityTab: React.FC<{ workspace: WorkspaceDetail }> = ({
                   color: 'var(--color-text-primary)',
                 }}
               >
-                <span style={{ fontWeight: 600 }}>{actorName}</span>{' '}
-                {formatActionText(log.action, log)}
+                <span style={{ fontWeight: 600 }}>
+                  {actorName}
+                </span>{' '}
+                {formatActionText(log)}
               </p>
 
               <p
@@ -243,7 +261,8 @@ export const ActivityTab: React.FC<{ workspace: WorkspaceDetail }> = ({
                     border: '1px solid var(--color-border)',
                     borderRadius: '8px',
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                    gridTemplateColumns:
+                      'repeat(auto-fit, minmax(140px, 1fr))',
                     gap: 'var(--space-8)',
                   }}
                 >
@@ -289,8 +308,10 @@ export const ActivityTab: React.FC<{ workspace: WorkspaceDetail }> = ({
         >
           <Button
             variant="outline"
-            disabled={page === 1}
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            disabled={page === 1 || isFetching}
+            onClick={() =>
+              setPage((current) => Math.max(1, current - 1))
+            }
           >
             Previous
           </Button>
@@ -306,7 +327,7 @@ export const ActivityTab: React.FC<{ workspace: WorkspaceDetail }> = ({
 
           <Button
             variant="outline"
-            disabled={!pagination.hasNext}
+            disabled={!pagination.hasNext || isFetching}
             onClick={() => setPage((current) => current + 1)}
           >
             Next
@@ -316,3 +337,4 @@ export const ActivityTab: React.FC<{ workspace: WorkspaceDetail }> = ({
     </div>
   );
 };
+

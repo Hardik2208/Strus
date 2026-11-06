@@ -91,7 +91,9 @@ export const AgreementPage: React.FC = () => {
             <div>
               <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)' }}>Budget</div>
               <div style={{ fontSize: 'var(--text-md)', fontWeight: 500 }}>
-                {agreement.budget ? `₹${agreement.budget.toLocaleString()}` : 'Not specified'}
+                {agreement.budget
+  ? `₹${Number(agreement.budget).toLocaleString('en-IN')}`
+  : 'Not specified'}
               </div>
             </div>
             <div>
@@ -112,14 +114,14 @@ export const AgreementPage: React.FC = () => {
             <div>
               <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-8)' }}>Description</div>
               <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                {agreement.description}
+                {agreement.description || 'No description provided.'}
               </div>
             </div>
             
             <div>
               <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-8)' }}>Scope</div>
               <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                {agreement.scope}
+                {agreement.scope || 'No scope details provided.'}
               </div>
             </div>
 

@@ -21,13 +21,13 @@ export const AgreementForm: React.FC<AgreementFormProps> = ({ projectId, agreeme
 
   const { register, handleSubmit, formState: { errors } } = useForm<CreateAgreementRequest>({
     defaultValues: {
-      title: agreement?.title || '',
-      description: agreement?.description || '',
-      scope: agreement?.scope || '',
-      outOfScope: agreement?.outOfScope || '',
-      budget: agreement?.budget || undefined,
-      expectedDuration: agreement?.expectedDuration || undefined,
-    }
+  title: agreement?.title || '',
+  description: agreement?.description || '',
+  scope: agreement?.scope || '',
+  outOfScope: agreement?.outOfScope || '',
+  budget: agreement?.budget ? Number(agreement.budget) : undefined,
+  expectedDuration: agreement?.expectedDuration || undefined,
+}
   });
 
   const onSubmit = async (data: CreateAgreementRequest) => {

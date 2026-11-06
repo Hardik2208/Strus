@@ -10,6 +10,7 @@ import type { AuthenticatedRequest } from "../../auth/interfaces/auth.interface.
 import { AgreementPublisher } from "../../event/publishers/agreement.publisher.js";
 import type { CreateAgreementDto } from "../dtos/create-agreement.dto.js";
 import type { UpdateAgreementDto } from "../dtos/update-agreement.dto.js";
+import { ProjectCache } from "../../project/cache/project.cache.js";
 
 export class AgreementController {
   // ==================================================
@@ -33,6 +34,8 @@ export class AgreementController {
           dto
         )
     );
+
+    await ProjectCache.syncProject(projectId);
 
     await AgreementPublisher.publishAgreementCreated({
   createdById: req.user.id,
@@ -92,6 +95,8 @@ export class AgreementController {
           dto
         )
     );
+
+    await ProjectCache.syncProject(projectId);
 
     await AgreementPublisher.publishAgreementUpdated({
   createdById: req.user.id,

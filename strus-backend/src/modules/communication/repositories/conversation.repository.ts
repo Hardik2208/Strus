@@ -385,4 +385,76 @@ static async findReadableConversation(
     },
   });
 }
+
+static async upsertProjectConversation(
+  tx: Prisma.TransactionClient,
+  projectId: string
+) {
+  return tx.conversation.upsert({
+    where: {
+      projectId,
+    },
+
+    create: {
+      type: ConversationType.PROJECT,
+
+      project: {
+        connect: {
+          id: projectId,
+        },
+      },
+    },
+
+    update: {},
+
+    select: conversationSummarySelect,
+  });
+}
+
+static async findProjectParticipantState(
+  projectId: string,
+  userId: string
+) {
+  return prisma.conversation.findFirst({
+    where: {
+      projectId,
+
+      participants: {
+        some: {
+          userId,
+        },
+      },
+    },
+
+    select: {
+      id: true,
+
+      nextMessageSequence: true,
+
+      participants: {
+        where: {
+          userId,
+        },
+
+        select: {
+          lastReadSequence: true,
+        },
+
+        take: 1,
+      },
+    },
+  });
+}
+
+static async findProjectMetadata(
+  projectId: string
+) {
+  return prisma.conversation.findUnique({
+    where: {
+      projectId,
+    },
+
+    select: conversationSummarySelect,
+  });
+}
 }

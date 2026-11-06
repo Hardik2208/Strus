@@ -7,6 +7,9 @@ import { CommunicationCache } from "../cache/conversation.cache.js";
 import { AppError } from "../../../core/errors/AppError.js";
 import { ErrorCode } from "../../../core/errors/ErrorCodes.js";
 import type { ConversationResponse } from "../interfaces/conversation-response.interface.js";
+import { prisma } from "../../../core/database/prisma.js";
+import { ProjectPermissionService } from "../../project/services/project-permission.service.js";
+import { ProjectConversationService } from "./project-conversation.service.js";
 
 export class ConversationService {
   private static calculateConversationState(
@@ -203,53 +206,110 @@ static async getProjectConversation(
   projectId: string,
   userId: string
 ): Promise<ConversationResponse> {
-  // ------------------------------------------
-  // Cache
-  // ------------------------------------------
+  // ==================================================
+  // 1. Verify current user's conversation membership
+  // ==================================================
 
-  const cached =
-    await CommunicationCache.getProjectConversation(
-      projectId
-    );
-
-  if (cached) {
-    return cached;
-  }
-
-  // ------------------------------------------
-  // Database
-  // ------------------------------------------
-
-  const conversation =
-    await ConversationRepository.findByProjectId(
+  const participantState =
+    await ConversationRepository.findProjectParticipantState(
       projectId,
       userId
     );
 
-  if (!conversation) {
+  if (!participantState) {
     throw new AppError(
       "Project conversation not found.",
       404,
       ErrorCode.CONVERSATION_NOT_FOUND
     );
   }
-const response =
-  ConversationMapper.toConversationResponse({
-    ...conversation,
-    ...this.calculateConversationState(
-      conversation
-    ),
-  });
 
-  // ------------------------------------------
-  // Cache
-  // ------------------------------------------
+  // ==================================================
+  // 2. Read shared metadata from Redis
+  // ==================================================
 
-  await CommunicationCache.setProjectConversation(
-    projectId,
-    response
+  let metadata =
+    await CommunicationCache.getProjectConversationMetadata(
+      projectId
+    );
+
+  // ==================================================
+  // 3. Cache miss: fetch metadata from PostgreSQL
+  // ==================================================
+
+  if (
+    !metadata ||
+    metadata.id !== participantState.id
+  ) {
+    metadata =
+      await ConversationRepository.findProjectMetadata(
+        projectId
+      );
+
+    if (!metadata) {
+      throw new AppError(
+        "Project conversation not found.",
+        404,
+        ErrorCode.CONVERSATION_NOT_FOUND
+      );
+    }
+
+    // Protect against stale cache entries after
+    // conversation replacement or repair.
+    if (metadata.id !== participantState.id) {
+      await CommunicationCache.invalidateProjectConversation(
+        projectId
+      );
+
+      throw new AppError(
+        "Project conversation state is inconsistent.",
+        409,
+        ErrorCode.CONVERSATION_NOT_FOUND
+      );
+    }
+
+    await CommunicationCache.setProjectConversationMetadata(
+      projectId,
+      {
+        id: metadata.id,
+        type: metadata.type,
+        status: metadata.status,
+        workspace: metadata.workspace,
+        project: metadata.project,
+        lastActivityAt: metadata.lastActivityAt,
+        lastMessage: metadata.lastMessage,
+      }
+    );
+  }
+
+  // ==================================================
+  // 4. Calculate fresh user-specific read state
+  // ==================================================
+
+  const latestSequence =
+    participantState.nextMessageSequence - 1;
+
+  const lastReadSequence =
+    participantState.participants[0]
+      ?.lastReadSequence ?? 0;
+
+  const unreadCount = Math.max(
+    latestSequence - lastReadSequence,
+    0
   );
 
-  return response;
+  // ==================================================
+  // 5. Return combined response
+  // ==================================================
+
+  return {
+    ...metadata,
+
+    latestSequence,
+
+    lastReadSequence,
+
+    unreadCount,
+  };
 }
 }

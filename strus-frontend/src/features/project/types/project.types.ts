@@ -1,16 +1,27 @@
-export type ProjectStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'MUTUALLY_TERMINATED';
 
-export type ProjectSetupStage = 
-  | 'PROJECT_CREATED' 
-  | 'AGREEMENT_COMPLETED' 
-  | 'PROFESSIONALS_ASSIGNED' 
+export type ProjectStatus =
+  | 'DRAFT'
+  | 'ACTIVE'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'MUTUALLY_TERMINATED'
+  | 'DISPUTE_TERMINATED';
+
+export type ProjectSetupStage =
+  | 'PROJECT_CREATED'
+  | 'AGREEMENT_COMPLETED'
+  | 'PROFESSIONALS_ASSIGNED'
   | 'MILESTONES_CREATED'
   | 'READY_TO_START';
 
-export type ProjectAuditAction = 
-  | 'CREATED' 
-  | 'UPDATED' 
-  | 'STATUS_CHANGED' 
+export type ProjectAuditAction =
+  | 'CREATED'
+  | 'UPDATED'
+  | 'STATUS_CHANGED'
+  | 'ACTIVATED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'MUTUALLY_TERMINATED'
   | 'DELETED';
 
 export interface Project {
@@ -33,10 +44,15 @@ export interface Project {
 
 export interface ProjectAudit {
   id: string;
-  projectId: string;
-  actorId: string;
   action: ProjectAuditAction;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown> | null;
+  actor: {
+    id: string;
+    username: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+  } | null;
   createdAt: string;
 }
 
@@ -45,7 +61,7 @@ export interface ProjectListParams {
   limit?: number;
   search?: string;
   status?: ProjectStatus;
-  sort?: 'createdAt' | 'updatedAt' | 'title' | 'status';
+  sort?: 'createdAt' | 'title' | 'expectedStartDate' | 'expectedCompletionDate';
   order?: 'asc' | 'desc';
 }
 
@@ -75,4 +91,19 @@ export interface PaginatedProjectResponse {
 export interface PaginatedAuditResponse {
   audits: ProjectAudit[];
   pagination: PaginationMeta;
+}
+
+export type ProjectSortField =
+  | 'createdAt'
+  | 'title'
+  | 'expectedStartDate'
+  | 'expectedCompletionDate';
+
+export interface ProjectListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: ProjectStatus;
+  sort?: ProjectSortField;
+  order?: 'asc' | 'desc';
 }

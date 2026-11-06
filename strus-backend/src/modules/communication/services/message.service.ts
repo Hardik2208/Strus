@@ -19,6 +19,9 @@ import type { ReadReceipt } from "../repositories/message.repository.js";
 import { CommunicationSocket } from "../../../core/socket/communication.socket.js";
 import { MessageMapper } from "../mappers/message.mapper.js";
 import { CommunicationCache } from "../cache/conversation.cache.js";
+import { WorkspaceRepository } from "../../workspace/repositories/workspace.repository.js";
+import { WorkspaceRole } from "../../../generated/prisma/enums.js";
+
 
 export class MessageService {
   static async sendMessage(
@@ -379,14 +382,12 @@ static async updateMessage(
 // Delete Message
 // ==================================================
 
+
 static async deleteMessage(
   dto: DeleteMessageDto,
   userId: string
 ): Promise<void> {
-  // ==================================================
-  // Permission + Existence Check
-  // ==================================================
-
+  // 1. Find message and verify conversation membership.
   const message =
     await MessageRepository.findDeletableMessage(
       dto.messageId,
@@ -401,19 +402,58 @@ static async deleteMessage(
     );
   }
 
-  // ==================================================
-  // Load Persisted Attachments
-  // ==================================================
+  // 2. Own messages can always be deleted.
+  const isOwnMessage = message.senderId === userId;
 
+  let canDelete = isOwnMessage;
+
+  // 3. Apply Workspace moderation permissions.
+  if (
+    !isOwnMessage &&
+    message.conversation.workspaceId
+  ) {
+    const workspaceId =
+      message.conversation.workspaceId;
+
+    const [actorMembership, senderMembership] =
+      await Promise.all([
+        WorkspaceRepository.findMember(
+          workspaceId,
+          userId
+        ),
+        WorkspaceRepository.findMember(
+          workspaceId,
+          message.senderId
+        ),
+      ]);
+
+    if (actorMembership?.role === WorkspaceRole.OWNER) {
+      // OWNER can delete ADMIN and MEMBER messages.
+      canDelete = Boolean(senderMembership);
+    } else if (
+      actorMembership?.role === WorkspaceRole.ADMIN
+    ) {
+      // ADMIN can delete MEMBER messages only.
+      canDelete =
+        senderMembership?.role === WorkspaceRole.MEMBER;
+    }
+  }
+
+  if (!canDelete) {
+    throw new AppError(
+      "You do not have permission to delete this message.",
+      403,
+      ErrorCode.INSUFFICIENT_PERMISSIONS
+    );
+  }
+
+  // 4. Load attachments before deleting their metadata.
   const attachments =
     await MessageRepository.findAttachments(
       dto.messageId
     );
 
-  // ==================================================
-  // Database Transaction
-  // ==================================================
-
+  // 5. Soft-delete inside a transaction.
   await prisma.$transaction(
     async (tx: Prisma.TransactionClient) => {
       await MessageRepository.deleteAttachments(
@@ -428,10 +468,7 @@ static async deleteMessage(
     }
   );
 
-  // ==================================================
-  // Cloudinary Cleanup (Best Effort)
-  // ==================================================
-
+  // 6. Best-effort Cloudinary cleanup.
   if (attachments.length > 0) {
     try {
       await MessageAttachmentService.deletePersistedAttachments(
@@ -445,19 +482,22 @@ static async deleteMessage(
     }
   }
 
-CommunicationSocket.emitMessageDeleted(
-  message.conversationId,
-  {
-    messageId: message.id,
-    conversationId: message.conversationId,
-    deletedAt: new Date(),
-  }
-);
+  // 7. Emit event after successful database transaction.
+  CommunicationSocket.emitMessageDeleted(
+    message.conversationId,
+    {
+      messageId: message.id,
+      conversationId: message.conversationId,
+      deletedAt: new Date(),
+    }
+  );
 
-await CommunicationCache.invalidateConversation(
-  message.conversation
-);
+  // 8. Invalidate conversation cache.
+  await CommunicationCache.invalidateConversation(
+    message.conversation
+  );
 }
+
 
 static async markConversationAsRead(
   dto: MarkConversationReadDto,

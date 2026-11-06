@@ -263,7 +263,7 @@ static async update(
 });
 
     await Promise.all([
-  ProjectCache.invalidate(projectId),
+  ProjectCache.syncProject(projectId),
 
   ProjectCache.invalidateWorkspace(
     project.workspaceId
@@ -422,10 +422,7 @@ static async updateStatus(
     }
 
     await Promise.all([
-      ProjectCache.invalidate(
-        projectId
-      ),
-
+      ProjectCache.syncProject(projectId),
       ProjectCache.invalidateWorkspace(
         project.workspaceId
       ),
@@ -508,7 +505,7 @@ static async transfer(
 });
 
     await Promise.all([
-  ProjectCache.invalidate(
+  ProjectCache.syncProject(
     projectId
   ),
 

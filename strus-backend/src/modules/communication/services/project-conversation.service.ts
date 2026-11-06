@@ -1,49 +1,95 @@
-import type { Prisma, Conversation } from "../../../generated/prisma/client.js";
-import { ConversationStatus } from "../../../generated/prisma/client.js";
-import { ConversationParticipantRepository } from "../repositories/conversation-participant.repository.js";
-import { ConversationRepository } from "../repositories/conversation.repository.js";
+import type { Prisma } from "../../../generated/prisma/client.js";
+
 import {
   AgreementInvitationStatus,
   AgreementParticipantRole,
+  ConversationStatus,
   ProjectStatus,
 } from "../../../generated/prisma/enums.js";
+
+import { ConversationParticipantRepository } from "../repositories/conversation-participant.repository.js";
+import { ConversationRepository } from "../repositories/conversation.repository.js";
 import { AgreementParticipantRepository } from "../../agreement/repositories/agreement-participant.repository.js";
 
 export class ProjectConversationService {
-  static async activate(
-  tx: Prisma.TransactionClient,
-  projectId: string
-) {
-  const existingConversation =
-    await ConversationRepository.findProjectConversation(
+  /**
+   * Ensures that exactly one conversation exists for a project.
+   *
+   * The project creator is always the initial participant.
+   * Accepted professionals are synchronized only after activation.
+   *
+   * Must be called inside the caller's database transaction.
+   */
+  static async ensureInitialized(
+    tx: Prisma.TransactionClient,
+    projectId: string
+  ) {
+    const project = await tx.project.findFirst({
+      where: {
+        id: projectId,
+        deletedAt: null,
+      },
+
+      select: {
+        id: true,
+        createdById: true,
+        status: true,
+
+        agreement: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (!project) {
+      throw new Error(
+        "Cannot initialize conversation for a missing project."
+      );
+    }
+
+    // The unique projectId constraint makes this concurrency-safe.
+    const conversation =
+      await ConversationRepository.upsertProjectConversation(
+        tx,
+        projectId
+      );
+
+    // The creator is the Client/Project owner.
+    await ConversationParticipantRepository.createMany(
       tx,
-      projectId
+      [
+        {
+          conversationId: conversation.id,
+          userId: project.createdById,
+        },
+      ]
     );
 
-  if (existingConversation) {
-    return existingConversation;
-  }
+    const terminalProjectStatuses = new Set<ProjectStatus>([
+  ProjectStatus.COMPLETED,
+  ProjectStatus.CANCELLED,
+  ProjectStatus.MUTUALLY_TERMINATED,
+  ProjectStatus.DISPUTE_TERMINATED,
+]);
 
-  return ConversationRepository.createProjectConversation(
+const isTerminalProject =
+  terminalProjectStatuses.has(project.status);
+
+    // Professionals become conversation participants only
+    // when the project is active and their invitations are accepted.
+    if (project.agreement) {
+  await this.syncParticipants(
     tx,
-    projectId
+    project.agreement.id
   );
 }
 
-  static async complete(
-  tx: Prisma.TransactionClient,
-  projectId: string
+if (
+  isTerminalProject &&
+  conversation.status !== ConversationStatus.READ_ONLY
 ) {
-  const conversation =
-    await ConversationRepository.findProjectConversation(
-      tx,
-      projectId
-    );
-
-  if (!conversation) {
-    return;
-  }
-
   await ConversationRepository.updateStatus(
     tx,
     conversation.id,
@@ -51,122 +97,137 @@ export class ProjectConversationService {
   );
 }
 
-  static async syncParticipants(
-  tx: Prisma.TransactionClient,
-  agreementId: string
-): Promise<void> {
-  // ==================================================
-  // Load Agreement
-  // ==================================================
-
-  const agreement =
-    await AgreementParticipantRepository.findForConversationSync(
-      agreementId
-    );
-
-  if (!agreement) {
-    return;
+    return conversation;
   }
 
-  // ==================================================
-  // Project Must Be Active
-  // ==================================================
-
-  if (
-    agreement.project.status !==
-    ProjectStatus.ACTIVE
+  /**
+   * Called when a project becomes ACTIVE.
+   */
+  static async activate(
+    tx: Prisma.TransactionClient,
+    projectId: string
   ) {
-    return;
-  }
-
-  // ==================================================
-  // Load Project Conversation
-  // ==================================================
-
-  const conversation =
-    await ConversationRepository.findProjectConversation(
+    return this.ensureInitialized(
       tx,
-      agreement.project.id
+      projectId
     );
-
-  if (!conversation) {
-    return;
   }
 
-  // ==================================================
-// Determine Expected Participants
-// ==================================================
+  /**
+   * Completed projects retain their conversation history,
+   * but the conversation becomes read-only.
+   */
+  static async complete(
+    tx: Prisma.TransactionClient,
+    projectId: string
+  ) {
+    const conversation =
+      await ConversationRepository.findProjectConversation(
+        tx,
+        projectId
+      );
 
-const expectedUserIds =
-  agreement.participants
-    .filter(participant => {
-      if (
+    if (!conversation) {
+      return;
+    }
+
+    await ConversationRepository.updateStatus(
+      tx,
+      conversation.id,
+      ConversationStatus.READ_ONLY
+    );
+  }
+
+  /**
+   * Synchronizes conversation membership from the Agreement.
+   *
+   * Client = Agreement creator.
+   * Professional = accepted Agreement participant.
+   */
+  static async syncParticipants(
+    tx: Prisma.TransactionClient,
+    agreementId: string
+  ): Promise<void> {
+    const agreement =
+      await AgreementParticipantRepository.findForConversationSync(
+        tx,
+        agreementId
+      );
+
+    if (!agreement) {
+      return;
+    }
+    const conversation =
+      await ConversationRepository.findProjectConversation(
+        tx,
+        agreement.project.id
+      );
+
+    if (!conversation) {
+      return;
+    }
+
+    const expectedUserIds = new Set<string>([
+      agreement.createdById,
+    ]);
+
+    for (const participant of agreement.participants) {
+      const isClient =
         participant.role ===
-        AgreementParticipantRole.CLIENT
-      ) {
-        return true;
-      }
+        AgreementParticipantRole.CLIENT;
 
-      return (
+      const isAcceptedProfessional =
         participant.role ===
           AgreementParticipantRole.PROFESSIONAL &&
         participant.invitationStatus ===
-          AgreementInvitationStatus.ACCEPTED
+          AgreementInvitationStatus.ACCEPTED;
+
+      if (
+        isClient ||
+        isAcceptedProfessional
+      ) {
+        expectedUserIds.add(
+          participant.userId
+        );
+      }
+    }
+
+    const existingParticipants =
+      await ConversationParticipantRepository.findParticipants(
+        tx,
+        conversation.id
       );
-    })
-    .map(participant => participant.userId);
 
-    // ==================================================
-// Load Existing Participants
-// ==================================================
+    const existingUserIds =
+      existingParticipants.map(
+        participant => participant.userId
+      );
 
-const existingParticipants =
-  await ConversationParticipantRepository.findParticipants(
-    tx,
-    conversation.id
-  );
+    const usersToAdd = [
+      ...expectedUserIds,
+    ].filter(
+      userId =>
+        !existingUserIds.includes(userId)
+    );
 
-const existingUserIds =
-  existingParticipants.map(
-    participant => participant.userId
-  );
+    const usersToRemove =
+      existingUserIds.filter(
+        userId =>
+          !expectedUserIds.has(userId)
+      );
 
-  // ==================================================
-// Calculate Participant Changes
-// ==================================================
+    await ConversationParticipantRepository.createMany(
+      tx,
+      usersToAdd.map(userId => ({
+        conversationId: conversation.id,
+        userId,
+      }))
+    );
 
-const usersToAdd =
-  expectedUserIds.filter(
-    userId =>
-      !existingUserIds.includes(userId)
-  );
-
-const usersToRemove =
-  existingUserIds.filter(
-    userId =>
-      !expectedUserIds.includes(userId)
-  );
-
-  // ==================================================
-// Add Participants
-// ==================================================
-
-await ConversationParticipantRepository.createMany(
-  tx,
-  usersToAdd.map(userId => ({
-    conversationId: conversation.id,
-    userId,
-  }))
-);
-
-// ==================================================
-// Remove Participants
-// ==================================================
-
-await ConversationParticipantRepository.deleteMany(
-  tx,
-  conversation.id,
-  usersToRemove
-);
-}
+    await ConversationParticipantRepository.deleteMany(
+      tx,
+      conversation.id,
+      usersToRemove
+    );
+  }
 }

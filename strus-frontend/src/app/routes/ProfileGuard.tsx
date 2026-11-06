@@ -1,11 +1,19 @@
+
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
+
 import { useAuthStore } from '../../features/auth/store/auth.store';
 
 export const ProfileGuard: React.FC = () => {
-  const { user } = useAuthStore();
+  const profileCompleted = useAuthStore(
+    (state) => state.profileCompleted,
+  );
 
-  if (user && !user.profileCompleted) {
+  if (profileCompleted === null) {
+    return null;
+  }
+
+  if (!profileCompleted) {
     return <Navigate to="/profile/setup" replace />;
   }
 

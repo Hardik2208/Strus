@@ -19,6 +19,7 @@ import {
 import {
   updateInvitationStatusSchema,
 } from "../dtos/update-invitation-status.dto.js";
+import { ProjectCache } from "../../project/cache/project.cache.js";
 
 export class AgreementParticipantController {
   // ==================================================
@@ -135,6 +136,11 @@ export class AgreementParticipantController {
           )
       );
 
+      await ProjectCache.syncProject(
+  projectId,
+  [participant.userId]
+);
+
     if (
   dto.status ===
   AgreementInvitationStatus.ACCEPTED
@@ -237,6 +243,12 @@ if (
         req.user.id
       )
   );
+
+
+  await ProjectCache.syncProject(
+  projectId,
+  [participant.userId]
+);
 
   await AgreementPublisher.publishProfessionalRemoved({
   createdById: req.user.id,

@@ -15,7 +15,6 @@ import type { CreateExecutionPlanDto } from "../dtos/create-execution-plan.dto.j
 import { MilestoneSpecificationService } from "./milestone-specification.service.js";
 import { ExecutionRepository } from "../repositories/execution.repository.js";
 import { ExecutionAuditRepository } from "../repositories/execution-audit.repository.js";
-import { ProjectCache } from "../../project/cache/project.cache.js"
 import { ExecutionPermissionService } from "./execution-permission.service.js";
 
 import { ExecutionValidator } from "../validators/execution.validator.js";
@@ -116,8 +115,6 @@ await ExecutionRepository.updateSetupStage(
   projectId,
   ProjectSetupStage.PROFESSIONALS_ASSIGNED
 );
-
-await ProjectCache.invalidate(projectId);
 
 
 await ExecutionAuditRepository.create(tx, {
@@ -308,12 +305,7 @@ private static async createExecutionPlanInternal(
     },
   });
 
-  await Promise.all([
-    ProjectCache.invalidate(projectId),
-    MilestoneCache.invalidateExecutionPlan(
-      projectId
-    ),
-  ]);
+  await MilestoneCache.invalidateExecutionPlan(projectId);
 
   return milestones;
 }

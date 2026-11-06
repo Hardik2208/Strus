@@ -13,7 +13,14 @@ export const ActiveProjectsWidget: React.FC<{ projects: ActiveProject[] }> = ({ 
       <EmptyState 
         title="No active projects" 
         description="Your active projects will appear here once you begin working on a project." 
-        action={<Button variant="outline" onClick={() => navigate('/projects')}>View Projects</Button>}
+        action={
+  <Button
+    variant="outline"
+    onClick={() => navigate('/dashboard/professional/projects')}
+  >
+    View Projects
+  </Button>
+}
       />
     );
   }
@@ -58,9 +65,14 @@ export const ActiveProjectsWidget: React.FC<{ projects: ActiveProject[] }> = ({ 
              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-success)' }}>
                {p.status || 'ACTIVE'}
              </span>
-             <Button variant="outline" onClick={() => navigate(`/workspaces/${p.workspaceId}/projects/${p.id}`)}>
-               Open Project
-             </Button>
+             <Button
+  variant="outline"
+  onClick={() =>
+    navigate(`/dashboard/professional/projects/${p.id}/overview`)
+  }
+>
+  Open Project
+</Button>
           </div>
         </Card>
       ))}
