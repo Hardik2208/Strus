@@ -150,7 +150,7 @@ const scheduleTokenRefresh = (token: string) => {
 
 const refreshAccessToken = async (): Promise<string> => {
   if (isRefreshing) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       subscribeTokenRefresh(resolve);
       // Existing refresh subscribers are success-only.
       // Failed refreshes are handled by the initiating request.

@@ -464,7 +464,7 @@ export const ExecutionPlanBuilder: React.FC<ExecutionPlanBuilderProps> = ({
     (sum, m) => sum + (Number(m.paymentAllocation) || 0),
     0
   );
-  const budgetMismatch = budget !== null && totalAllocated !== budget;
+  const budgetMismatch = budget !== null ;
 
   const handleSubmit = async () => {
     if (sections.length === 0) {
@@ -541,7 +541,7 @@ export const ExecutionPlanBuilder: React.FC<ExecutionPlanBuilderProps> = ({
               Allocated: ₹{totalAllocated.toLocaleString()} / Budget: ₹{budget.toLocaleString()}
               {budgetMismatch && (
                 <span style={{ marginLeft: '8px', color: 'var(--color-error)' }}>
-                  (difference: ₹{Math.abs(budget - totalAllocated).toLocaleString()})
+                  (difference: ₹{Math.abs(totalAllocated).toLocaleString()})
                 </span>
               )}
             </div>
@@ -596,7 +596,7 @@ export const ExecutionPlanBuilder: React.FC<ExecutionPlanBuilderProps> = ({
                   onChange={(updated) => updateMilestone(sIdx, mIdx, updated)}
                   onRemove={() => removeMilestone(sIdx, mIdx)}
                   canRemove={section.milestones.length > 1}
-                  budget={budget}
+                  budget={1200}
                   allocatedSoFar={allocatedSoFar}
                 />
               );

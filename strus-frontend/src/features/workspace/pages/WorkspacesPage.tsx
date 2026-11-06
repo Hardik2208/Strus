@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useWorkspacesList } from '../hooks/useWorkspace';
 import { WorkspaceCard } from '../components/WorkspaceCard';
 import { CreateWorkspaceModal } from '../components/modals/CreateWorkspaceModal';
 import { Button } from '../../../components/ui/Button';
 import { useWorkspaceRealtime } from '../hooks/useWorkspaceRealtime';
-import type { WorkspaceSummary } from '../types/workspace.types';
 import { useInfiniteWorkspacesList } from '../hooks/useWorkspace';
 
 export const WorkspacesPage: React.FC = () => {

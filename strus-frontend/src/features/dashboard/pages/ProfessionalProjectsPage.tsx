@@ -12,11 +12,8 @@ export const ProfessionalProjectsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | ''>('');
-  const [sortBy, setSortBy] =
-  useState<ProjectSortField>('createdAt');
-
-const [sortOrder, setSortOrder] =
-  useState<'asc' | 'desc'>('desc');
+  const sortBy: ProjectSortField = 'createdAt';
+const sortOrder: 'asc' | 'desc' = 'desc';
 
   useEffect(() => {
     const timer = setTimeout(() => {
